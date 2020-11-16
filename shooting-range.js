@@ -90,19 +90,21 @@ export class ShootingRange extends Scene {
         // *** Materials
         this.materials = {
             range1: new Material(new defs.Phong_Shader(),
-                {ambient: .4, diffusivity: .6, color: color(1, 1, 1, 1)}),
+                {ambient: .5, diffusivity: .6, color: hex_color("#ffffff")}),
             range2: new Material(new defs.Phong_Shader(),
-                {ambient: .4, diffusivity: .6, color: color(1, 1, 1, 1)}),   
+                {ambient: .7, diffusivity: .6, color: color(1, 1, 1, 1)}),
             column: new Material(new defs.Phong_Shader(),
-                {ambient: .4, diffusivity: .6, color: color(0, 0, 0, 1)}), 
+                {ambient: .6, diffusivity: .6, color: color(0, 0, 0, 1)}),
             target: new Material(new defs.Phong_Shader(),
                 {ambient: 1, diffusivity: .6, specularity: 1.0, color: color(1, 0, 0, 1)}), 
             text_image: new Material(texture, {
                 ambient: 1, diffusivity: 0, specularity: 0,
                 texture: new Texture("assets/text.png")}),
+            projectile: new Material(new defs.Phong_Shader(),
+                {ambient: 1, color: hex_color("#f8d43d")}),
             gun_material: new Material(new defs.Phong_Shader, {
-            color: color(.5, .5, .5, 1),
-            ambient: .3, diffusivity: .5, specularity: .5})
+            color: color(0, 0, 0, 1),
+            ambient: .6, diffusivity: .5, specularity: .5})
         }
         
         //set camera location:
@@ -126,7 +128,7 @@ export class ShootingRange extends Scene {
             // Define the global camera and projection matrices, which are stored in program_state.
             program_state.set_camera(this.initial_camera_location);
         }
-        const light_position = vec4(0, 30, 20, 1);
+        const light_position = vec4(0, 30, 60, 1);
         program_state.lights = [new Light(light_position, color(1, 1, 1, 1), 1000)];
 
         let model_transform = Mat4.identity();
@@ -145,9 +147,25 @@ export class ShootingRange extends Scene {
 
         //shooting range floor and walls
         let floor_transform = model_transform.times(Mat4.scale(30, 0.3, 30));
-        let wall_transform = model_transform.times(Mat4.translation(0, 10, -10, 1)).times(Mat4.scale(25, 10, 0.3));
+        let wall_transform = model_transform.times(Mat4.translation(0, 10, -10, 1)).times(Mat4.scale(25, 30, 0.3));
+
+
         this.shapes.range.draw(context, program_state, floor_transform, this.materials.range1);
+
         this.shapes.range.draw(context, program_state, wall_transform, this.materials.range2);
+
+
+        let wall_transform_2 = model_transform.times(Mat4.translation(20, 10, -10)).times(Mat4.scale(0.3, 30, 50));
+
+        this.shapes.range.draw(context, program_state, wall_transform_2, this.materials.range2);
+
+        wall_transform_2 = wall_transform_2.times(Mat4.scale(10/3, 1/30, 1/50)).times(Mat4.translation(-40,0,0))
+                                            .times(Mat4.scale(0.3, 30, 50));
+
+        this.shapes.range.draw(context, program_state, wall_transform_2, this.materials.range2);
+
+
+
 
         //columns
         let column1 = model_transform.times(Mat4.translation(-15, 4, -9)).times(Mat4.scale(1, 4, 1));
@@ -163,9 +181,16 @@ export class ShootingRange extends Scene {
         let target1 = model_transform.times(Mat4.translation(-15, 9 + hover, -9));
         let target2 = model_transform.times(Mat4.translation(0, 9 + hover, -9));
         let target3 = model_transform.times(Mat4.translation(15, 9 + hover, -9));
-        this.shapes.target.draw(context, program_state, target1, this.materials.target);
-        this.shapes.target.draw(context, program_state, target2, this.materials.target);
-        this.shapes.target.draw(context, program_state, target3, this.materials.target);
+
+        const periodic = Math.cos(Math.PI*t/5);
+
+        let color_changer = color(0.5-(0.5*periodic),0,0.5+(0.5*periodic),1);
+        let color_changer_2 = color(0.5+(0.5*periodic),0,0.5-(0.5*periodic),1);
+        let color_changer_3 = color(0.5-(0.5*periodic),0.5+(0.5*periodic),0.5-(0.5*periodic),1);
+
+        this.shapes.target.draw(context, program_state, target1, this.materials.target.override({color: color_changer}));
+        this.shapes.target.draw(context, program_state, target2, this.materials.target.override({color: color_changer_2}));
+        this.shapes.target.draw(context, program_state, target3, this.materials.target.override({color: color_changer_3}));
 
      // display time
         let time = 30 - t;
@@ -179,13 +204,34 @@ export class ShootingRange extends Scene {
             this.shapes.text.set_string(line, context.context);
         }
 
-            this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-34, 26, 0)), this.materials.text_image);
+            this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-8, 26, 0)), this.materials.text_image);
 
 
         // draw the gun
-        let model_transform_gun = model_transform.times(Mat4.translation(0.4, 9.3, 47.5)).times(Mat4.rotation(Math.PI, 0, 1, 0)).times(Mat4.rotation(0.04, 1, 0, 0));
+        let model_transform_gun = model_transform.times(Mat4.translation(0.1, 8.8, 47.5)).times(Mat4.rotation(Math.PI, 0, 1, 0)).times(Mat4.rotation(0.04, 1, 0, 0));
+
+
+
+        console.log(defs.canvas_mouse_pos);
+
+        let mouse_x = 0;
+        let mouse_y = 0;
+
+        if(defs.canvas_mouse_pos) {
+            mouse_x = defs.canvas_mouse_pos.dot(vec(1, 0));
+            mouse_y = defs.canvas_mouse_pos.dot(vec(0, 1));
+        }
+
+        console.log(mouse_x + ',' + mouse_y);
+
+        model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(-mouse_x/1080), 0,1,0));
+        if(mouse_y >= 41)
+            model_transform_gun = model_transform_gun.times(Mat4.translation(0,-mouse_y/360,0))
+
+        model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(mouse_y/600), 1,0,0));
+
         this.shapes.gun.draw(context,program_state, model_transform_gun,this.materials.gun_material);
-        
+
         
     }
 }

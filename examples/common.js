@@ -1000,6 +1000,8 @@ const Movement_Controls = defs.Movement_Controls =
             // Log some values:
             this.pos = this.inverse().times(vec4(0, 0, 0, 1));
             this.z_axis = this.inverse().times(vec4(0, 0, 1, 0));
+
+            var canvas_mouse_pos = defs.canvas_mouse_pos = this.mouse.from_center;
         }
     }
 
