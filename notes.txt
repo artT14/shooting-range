@@ -1,0 +1,8 @@
+From XIAO ZENG to Everyone:  04:10 PM
+You can use Blender or Maya if you really want to model some characters. There's a tutorial video about Blender in Week3 section on CCLE
+
+
+link to host: http://localhost:8000/
+sci-fi sniper gun: https://free3d.com/3d-model/sci_fi_gun-732358.html
+column: https://free3d.com/3d-model/column-53061.html
+mouse picking: https://antongerdelan.net/opengl/raycasting.html

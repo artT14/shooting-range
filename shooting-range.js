@@ -1,4 +1,5 @@
 import {defs, tiny} from './examples/common.js';
+import {Shape_From_File} from './examples/obj-file-demo.js';
 
 const {
     Vector, Vector3, vec, vec3, vec4, color, hex_color, Shader, Matrix, Mat4, Light, Shape, Material, Scene, Texture
@@ -78,7 +79,8 @@ export class ShootingRange extends Scene {
             target: new (defs.Subdivision_Sphere.prototype.make_flat_shaded_version())(1),
 
             cube: new defs.Cube(), 
-            text: new Text_Line(35)
+            text: new Text_Line(35),
+            gun: new Shape_From_File("assets/m4a1.obj")
         };
 
         const texture = new defs.Textured_Phong(1);
@@ -98,6 +100,9 @@ export class ShootingRange extends Scene {
             text_image: new Material(texture, {
                 ambient: 1, diffusivity: 0, specularity: 0,
                 texture: new Texture("assets/text.png")}),
+            gun_material: new Material(new defs.Phong_Shader, {
+            color: color(.5, .5, .5, 1),
+            ambient: .3, diffusivity: .5, specularity: .5})
         }
         
         //set camera location:
@@ -111,7 +116,6 @@ export class ShootingRange extends Scene {
     make_control_panel() {
          //this.addEventListener('mousedown', () =>
     }
-
    
 
     display(context, program_state) {
@@ -176,6 +180,12 @@ export class ShootingRange extends Scene {
         }
 
             this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-34, 26, 0)), this.materials.text_image);
+
+
+        // draw the gun
+        let model_transform_gun = model_transform.times(Mat4.translation(0.4, 9.3, 47.5)).times(Mat4.rotation(Math.PI, 0, 1, 0)).times(Mat4.rotation(0.04, 1, 0, 0));
+        this.shapes.gun.draw(context,program_state, model_transform_gun,this.materials.gun_material);
+        
         
     }
 }
