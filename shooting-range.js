@@ -220,7 +220,7 @@ export class ShootingRange extends Scene {
         let wall_transform = model_transform.times(Mat4.translation(0, 10, -10, 1)).times(Mat4.scale(25, 30, 0.3));
 
 
-        //this.shapes.range.draw(context, program_state, floor_transform, this.materials.range1);
+        this.shapes.range.draw(context, program_state, floor_transform, this.materials.range2);
 
         this.shapes.range.draw(context, program_state, wall_transform, this.materials.range2);
 
@@ -282,29 +282,31 @@ export class ShootingRange extends Scene {
 
 
 
-//         console.log(defs.canvas_mouse_pos);
+         console.log(defs.canvas_mouse_pos);
 
-//         let mouse_x = 0;
-//         let mouse_y = 0;
+         let mouse_x = 0;
+         let mouse_y = 0;
 
-//         if(defs.canvas_mouse_pos) {
-//             mouse_x = defs.canvas_mouse_pos.dot(vec(1, 0));
-//             mouse_y = defs.canvas_mouse_pos.dot(vec(0, 1));
-//         }
+         if(defs.canvas_mouse_pos) {
+             mouse_x = defs.canvas_mouse_pos.dot(vec(1, 0));
+             mouse_y = defs.canvas_mouse_pos.dot(vec(0, 1));
+         }
 
-//         //console.log(mouse_x + ',' + mouse_y);
+        //console.log(mouse_x + ',' + mouse_y);
 
-//         model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(-mouse_x/1080), 0,1,0));
-//         if(mouse_y >= 41)
-//             model_transform_gun = model_transform_gun.times(Mat4.translation(0,-mouse_y/360,0))
+        model_transform_gun = model_transform_gun.times(Mat4.translation(3*mouse_x/540,3*mouse_y/300,0))
 
-//         model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(mouse_y/600), 1,0,0));
+        model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(-mouse_x/1000), 0,1,0));
 
-//         this.shapes.gun.draw(context,program_state, model_transform_gun,this.materials.gun_material);
+        model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(mouse_y/1000), 1,0,0));
+
+
+
+        this.shapes.gun.draw(context,program_state, model_transform_gun,this.materials.gun_material);
 
 
         //test target at origin, delete later
-        this.shapes.target.draw(context, program_state, model_transform, this.materials.target.override({color: color_changer_3}));
+        //this.shapes.target.draw(context, program_state, model_transform, this.materials.target.override({color: color_changer_3}));
         
 //         const once = {
 //             once : true;
