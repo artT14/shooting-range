@@ -24,6 +24,16 @@ class Cube extends Shape {
     }
 }
 
+class Line extends Shape {
+    constructor() {
+        super("position", "color");
+        this.arrays.position = Vector3.cast(
+            [1,1,-1], [1,1,1]);
+        this.arrays.color = Array(2).fill(0).map(x => color(0,0,0,1));
+        this.indices = false;
+    }
+}
+
 export class Text_Line extends Shape {                           // **Text_Line** embeds text in the 3D world, using a crude texture
                                                                  // method.  This Shape is made of a horizontal arrangement of quads.
                                                                  // Each is textured over with images of ASCII characters, spelling
@@ -67,6 +77,7 @@ export class Text_Line extends Shape {                           // **Text_Line*
 }
 
 
+
 export class ShootingRange extends Scene {
     constructor() {
         // constructor(): Scenes begin by populating initial values like the Shapes and Materials they'll need.
@@ -80,7 +91,9 @@ export class ShootingRange extends Scene {
 
             cube: new defs.Cube(), 
             text: new Text_Line(35),
-            gun: new Shape_From_File("assets/m4a1.obj")
+            gun: new Shape_From_File("assets/m4a1.obj"),
+
+            ray: new Line,
         };
 
         const texture = new defs.Textured_Phong(1);
@@ -90,7 +103,7 @@ export class ShootingRange extends Scene {
         // *** Materials
         this.materials = {
             range1: new Material(new defs.Phong_Shader(),
-                {ambient: .5, diffusivity: .6, color: hex_color("#ffffff")}),
+                {ambient: .5, diffusivity: .6, color: color(0, 0, 0, 1)}),
             range2: new Material(new defs.Phong_Shader(),
                 {ambient: .7, diffusivity: .6, color: color(1, 1, 1, 1)}),
             column: new Material(new defs.Phong_Shader(),
@@ -102,23 +115,77 @@ export class ShootingRange extends Scene {
                 texture: new Texture("assets/text.png")}),
             projectile: new Material(new defs.Phong_Shader(),
                 {ambient: 1, color: hex_color("#f8d43d")}),
-            gun_material: new Material(new defs.Phong_Shader, {
-            color: color(0, 0, 0, 1),
-            ambient: .6, diffusivity: .5, specularity: .5})
+            gun_material: new Material(new defs.Phong_Shader, 
+                {color: color(0, 0, 0, 1), ambient: .6, diffusivity: .5, specularity: .5}),
+            
+            ray: new Material(new defs.Basic_Shader()), 
+                
+               
         }
         
         //set camera location:
             // first vector is camera location
-            // middle vector is what we are looking at
+            // second vector is what we are looking at
             // set y value at 8 so we are looking at the far wall 
-        this.initial_camera_location = Mat4.look_at(vec3(0, 10, 50), vec3(0, 8, 0), vec3(0, 1, 0));
+        //look_at() gives you eye transformation matrix (world space --> eye space)
+        let camera_position = vec3(0, 10, 50);
+        this.initial_camera_location = Mat4.look_at(camera_position, vec3(0, 8, 0), vec3(0, 1, 0));
 
     }
 0
     make_control_panel() {
-         //this.addEventListener('mousedown', () =>
+        // addEventListener('mousedown', this.mouse_picking); //this works so mouse_picking is called when you click the left mouse button
     }
-   
+
+   // only called if you click the left mouse button
+    mouse_picking(context, program_state, model_transform){
+        
+        this.CLICK = false;
+
+        // same code as below for mouse movement
+        console.log(defs.canvas_mouse_pos);
+
+        let mouse_x = 0;
+        let mouse_y = 0;
+
+        if(defs.canvas_mouse_pos) {
+            mouse_x = defs.canvas_mouse_pos.dot(vec(1, 0));
+            mouse_y = defs.canvas_mouse_pos.dot(vec(0, 1));
+        }
+
+//         mouse_x = mouse_x + 540;
+//         mouse_y = (-mouse_y) + 300;
+
+        
+        let x = ((2.0 * mouse_x) / 1080.0) - 1.0;
+        let y = 1.0 - ((2.0 * mouse_y) / 600.0);
+        let mouse_view = vec4(x, y, -1, 1);
+
+
+        // projection matrix
+           let projection_matrix = Mat4.perspective(
+            Math.PI / 4, context.width / context.height, .1, 1000);;
+        
+        // eye matrix
+           let eye_matrix = Mat4.look_at(vec3(0, 10, 50), vec3(0, 8, 0), vec3(0, 1, 0));
+
+        // convert: (doesn't work yet)
+        let ray_eye = Mat4.inverse(projection_matrix).times(mouse_view);
+        ray_eye = vec4(ray_eye.xy, -1, 0);
+
+        let ray_world = (Mat4.inverse(eye_matrix).times(ray_eye));
+        //ray_world = ray_world.normalize();
+
+        
+        let world_point = Mat4.inverse(eye_matrix).times(Mat4.inverse(projection_matrix).times(mouse_view));
+        //console.log(eye_matrix);
+
+        console.log(mouse_view);
+        
+        //draw a ray 
+        this.shapes.ray.draw(context, program_state, model_transform, this.materials.ray, "LINES");
+
+    }
 
     display(context, program_state) {
         // display():  Called once per frame of animation.
@@ -135,10 +202,13 @@ export class ShootingRange extends Scene {
 
         program_state.projection_transform = Mat4.perspective(
             Math.PI / 4, context.width / context.height, .1, 1000);
+        
 
         
         const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
         
+        
+
        
     
     // makes up a preliminary scene
@@ -150,7 +220,7 @@ export class ShootingRange extends Scene {
         let wall_transform = model_transform.times(Mat4.translation(0, 10, -10, 1)).times(Mat4.scale(25, 30, 0.3));
 
 
-        this.shapes.range.draw(context, program_state, floor_transform, this.materials.range1);
+        //this.shapes.range.draw(context, program_state, floor_transform, this.materials.range1);
 
         this.shapes.range.draw(context, program_state, wall_transform, this.materials.range2);
 
@@ -212,29 +282,50 @@ export class ShootingRange extends Scene {
 
 
 
-        console.log(defs.canvas_mouse_pos);
+//         console.log(defs.canvas_mouse_pos);
 
-        let mouse_x = 0;
-        let mouse_y = 0;
+//         let mouse_x = 0;
+//         let mouse_y = 0;
 
-        if(defs.canvas_mouse_pos) {
-            mouse_x = defs.canvas_mouse_pos.dot(vec(1, 0));
-            mouse_y = defs.canvas_mouse_pos.dot(vec(0, 1));
+//         if(defs.canvas_mouse_pos) {
+//             mouse_x = defs.canvas_mouse_pos.dot(vec(1, 0));
+//             mouse_y = defs.canvas_mouse_pos.dot(vec(0, 1));
+//         }
+
+//         //console.log(mouse_x + ',' + mouse_y);
+
+//         model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(-mouse_x/1080), 0,1,0));
+//         if(mouse_y >= 41)
+//             model_transform_gun = model_transform_gun.times(Mat4.translation(0,-mouse_y/360,0))
+
+//         model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(mouse_y/600), 1,0,0));
+
+//         this.shapes.gun.draw(context,program_state, model_transform_gun,this.materials.gun_material);
+
+
+        //test target at origin, delete later
+        this.shapes.target.draw(context, program_state, model_transform, this.materials.target.override({color: color_changer_3}));
+        
+//         const once = {
+//             once : true;
+//         };
+
+       // addEventListener('click', this.mouse_picking, once);
+        var canvas = document.getElementById('main-canvas');
+        canvas.addEventListener('click', () => {
+            this.CLICK = true;
+        });
+
+        if (this.CLICK){
+            this.mouse_picking(context, program_state, model_transform);
         }
 
-        console.log(mouse_x + ',' + mouse_y);
 
-        model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(-mouse_x/1080), 0,1,0));
-        if(mouse_y >= 41)
-            model_transform_gun = model_transform_gun.times(Mat4.translation(0,-mouse_y/360,0))
 
-        model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(mouse_y/600), 1,0,0));
-
-        this.shapes.gun.draw(context,program_state, model_transform_gun,this.materials.gun_material);
-
-        
     }
 }
+
+
 
 
 // shaders from assignment 3 
