@@ -28,8 +28,8 @@ class Line extends Shape {
     constructor() {
         super("position", "color");
         this.arrays.position = Vector3.cast(
-            [1,1,-1], [1,1,1]);
-        this.arrays.color = Array(2).fill(0).map(x => color(0,0,0,1));
+            [0,0,-1], [0,0,1]);
+        this.arrays.color = Array(2).fill(0).map(x => hex_color("#fc0404"));
         this.indices = false;
     }
 }
@@ -252,6 +252,9 @@ export class ShootingRange extends Scene {
         let target2 = model_transform.times(Mat4.translation(0, 9 + hover, -9));
         let target3 = model_transform.times(Mat4.translation(15, 9 + hover, -9));
 
+
+
+
         const periodic = Math.cos(Math.PI*t/5);
 
         let color_changer = color(0.5-(0.5*periodic),0,0.5+(0.5*periodic),1);
@@ -278,11 +281,11 @@ export class ShootingRange extends Scene {
 
 
         // draw the gun
-        let model_transform_gun = model_transform.times(Mat4.translation(0.1, 8.8, 47.5)).times(Mat4.rotation(Math.PI, 0, 1, 0)).times(Mat4.rotation(0.04, 1, 0, 0));
+        let model_transform_gun = model_transform.times(Mat4.translation(0, 8.8, 47.5)).times(Mat4.rotation(Math.PI, 0, 1, 0)).times(Mat4.rotation(0.04, 1, 0, 0));
 
 
 
-         console.log(defs.canvas_mouse_pos);
+         //console.log(defs.canvas_mouse_pos);
 
          let mouse_x = 0;
          let mouse_y = 0;
@@ -292,17 +295,44 @@ export class ShootingRange extends Scene {
              mouse_y = defs.canvas_mouse_pos.dot(vec(0, 1));
          }
 
-        //console.log(mouse_x + ',' + mouse_y);
+         let x = (2*mouse_x)/1080-1;
+         let y = 1 - (2*mouse_y)/600;
+         let z = -1;
+
+         let ray_nds = vec3(x,y,z);
+
+         let ray_clip = ray_nds.to4(true);
+
+         let ray_eye = ray_clip.times(Mat4.inverse(program_state.projection_transform));
+
+         ray_eye[2] = -1;
+         ray_eye[3] = 0;
+
+         let ray_wor = ray_eye.times(program_state.camera_inverse);
+
+         ray_wor.normalize();
+
+        console.log(mouse_x + ',' + mouse_y);
+        console.log(ray_wor.dot(vec4(1,0,0,0)) + ',' + ray_clip.dot(vec4(0,1,0,0)) + ',' + ray_clip.dot(vec4(0,0,1,0)));
+
 
         model_transform_gun = model_transform_gun.times(Mat4.translation(3*mouse_x/540,3*mouse_y/300,0))
 
-        model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(-mouse_x/1000), 0,1,0));
+        model_transform_gun = model_transform_gun.times(Mat4.rotation(1.53*Math.atan(-mouse_x/1000), 0,1,0));
 
-        model_transform_gun = model_transform_gun.times(Mat4.rotation(Math.atan(mouse_y/1000), 1,0,0));
+
+        model_transform_gun = model_transform_gun.times(Mat4.rotation(1.59*Math.atan((mouse_y-8.8)/1000), 1,0,0));
 
 
 
         this.shapes.gun.draw(context,program_state, model_transform_gun,this.materials.gun_material);
+
+
+        model_transform_gun = model_transform_gun.times(Mat4.translation(0, 0, 40)).times(Mat4.scale(1,1,150));
+
+        this.shapes.ray.draw(context, program_state, model_transform_gun, this.materials.ray, "LINES");
+
+
 
 
         //test target at origin, delete later
