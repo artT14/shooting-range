@@ -76,7 +76,9 @@ export class Text_Line extends Shape {                           // **Text_Line*
     }
 }
 
+class Target{
 
+};
 
 export class ShootingRange extends Scene {
     constructor() {
@@ -86,7 +88,6 @@ export class ShootingRange extends Scene {
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
             range: new Cube,
-            column: new Cube,
             target: new (defs.Subdivision_Sphere.prototype.make_flat_shaded_version())(1),
 
             cube: new defs.Cube(), 
@@ -106,8 +107,6 @@ export class ShootingRange extends Scene {
                 {ambient: .5, diffusivity: .6, color: color(0, 0, 0, 1)}),
             range2: new Material(new defs.Phong_Shader(),
                 {ambient: .7, diffusivity: .6, color: color(1, 1, 1, 1)}),
-            column: new Material(new defs.Phong_Shader(),
-                {ambient: .6, diffusivity: .6, color: color(0, 0, 0, 1)}),
             target: new Material(new defs.Phong_Shader(),
                 {ambient: 1, diffusivity: .6, specularity: 1.0, color: color(1, 0, 0, 1)}), 
             text_image: new Material(texture, {
@@ -237,13 +236,7 @@ export class ShootingRange extends Scene {
 
 
 
-        //columns
-        let column1 = model_transform.times(Mat4.translation(-15, 4, -9)).times(Mat4.scale(1, 4, 1));
-        let column2 = model_transform.times(Mat4.translation(0, 4, -9)).times(Mat4.scale(1, 4, 1));
-        let column3 = model_transform.times(Mat4.translation(15, 4, -9)).times(Mat4.scale(1, 4, 1));
-        this.shapes.column.draw(context, program_state, column1, this.materials.column);
-        this.shapes.column.draw(context, program_state, column2, this.materials.column);
-        this.shapes.column.draw(context, program_state, column3, this.materials.column);
+
 
         
         //targets
@@ -316,7 +309,7 @@ export class ShootingRange extends Scene {
         console.log(ray_wor.dot(vec4(1,0,0,0)) + ',' + ray_clip.dot(vec4(0,1,0,0)) + ',' + ray_clip.dot(vec4(0,0,1,0)));
 
 
-        model_transform_gun = model_transform_gun.times(Mat4.translation(3*mouse_x/540,3*mouse_y/300,0))
+        model_transform_gun = model_transform_gun.times(Mat4.translation(3*mouse_x/540,0,0))
 
         model_transform_gun = model_transform_gun.times(Mat4.rotation(1.53*Math.atan(-mouse_x/1000), 0,1,0));
 
@@ -328,11 +321,9 @@ export class ShootingRange extends Scene {
         this.shapes.gun.draw(context,program_state, model_transform_gun,this.materials.gun_material);
 
 
-        model_transform_gun = model_transform_gun.times(Mat4.translation(0, 0, 40)).times(Mat4.scale(1,1,150));
+        //model_transform_gun = model_transform_gun.times(Mat4.translation(0, 0, 40)).times(Mat4.scale(1,1,150));
 
-        this.shapes.ray.draw(context, program_state, model_transform_gun, this.materials.ray, "LINES");
-
-
+        //this.shapes.ray.draw(context, program_state, model_transform_gun, this.materials.ray, "LINES");
 
 
         //test target at origin, delete later
