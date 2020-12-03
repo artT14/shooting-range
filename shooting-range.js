@@ -76,9 +76,32 @@ export class Text_Line extends Shape {                           // **Text_Line*
     }
 }
 
-class Target{
+/////////////TARGET CLASS MUST READ COMMENTS TO UNDERSTAND!!!!!!!!!! -AT
+/////////////////////////////////////////////////////////////////////////////////------------------------------------------
+class Target extends defs.Subdivision_Sphere{
+    static SCORE = 0;
+    constructor(level){ //pass in level in constructor, RECOMMEND USE 1-3, for 3 different levels
+        super(3-level); //lvl = 1 => subdivs of 2, lvl = 2 => subdivs of 1, lvl = 3 or greater => subdivs of 0
+        this.level = level; //in case you need the level of the object, might be useful into adding time when an Target is shot
+        this.isShot = false; //in case you need to check whether a target has been shot, might be useful in adding time to timer when a target is shot
+    }
 
+    draw(webgl_manager, program_state, model_transform, material, type = "TRIANGLES"){//need to override draw() function from parent
+        if(!this.isShot){ //if not shot, draw , else nothing happens => the target disappears from canvas since it's not being drawn.
+            super.draw(webgl_manager, program_state, model_transform, material, type = "TRIANGLES");
+        }
+
+    }
+
+    shoot() //when this function is called, the object is considered to be shot, once it's shot, it also adds to the SCORE
+    {
+            this.isShot = true;//set status of shot to true
+            Target.SCORE += this.level; //add to static member SCORE based on level, lvl 1 adds 1, lvl 2 adds 2, and so on
+    }
+
+    
 };
+////////////////////////////////////////////////////////////////////////////////////////////////////-----------------------------------------------------------
 
 export class ShootingRange extends Scene {
     constructor() {
@@ -88,18 +111,28 @@ export class ShootingRange extends Scene {
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
             range: new Cube,
-            target: new (defs.Subdivision_Sphere.prototype.make_flat_shaded_version())(1),
-
+            //target_lvl3: new (Target.prototype.make_flat_shaded_version())(3), //<= args is the level of the target
+            //target_lvl2: new (Target.prototype.make_flat_shaded_version())(2), //<= args is the level of the target
+            //target_lvl1: new (Target.prototype.make_flat_shaded_version())(1), //<= args is the level of the target
             cube: new defs.Cube(), 
             text: new Text_Line(35),
             gun: new Shape_From_File("assets/m4a1.obj"),
 
             ray: new Line,
         };
-
         const texture = new defs.Textured_Phong(1);
-        
 
+
+//////////////TARGET LIST ARRAY, we can use array to push targets when we want to create new one and pop them out when they are no longer in use e.g. shot
+        this.target_list = [
+            new (Target.prototype.make_flat_shaded_version())(3), //<= args is the level of the target
+            new (Target.prototype.make_flat_shaded_version())(2), //<= args is the level of the target
+            new (Target.prototype.make_flat_shaded_version())(1), //<= args is the level of the target
+        ];
+
+        this.target_list.push(new (Target.prototype.make_flat_shaded_version())(3));
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         // *** Materials
         this.materials = {
@@ -210,28 +243,28 @@ export class ShootingRange extends Scene {
 
        
     
-    // makes up a preliminary scene
-    // will clean it up when we implement mouse picking 
+        // makes up a preliminary scene
+        // will clean it up when we implement mouse picking
         let score = 0;
 
-        //shooting range floor and walls
+//DRAW RANGE FLOORS AND WALL ////////////////////////////////////////////////////////////////////////////////////////////////////////////
         let floor_transform = model_transform.times(Mat4.scale(30, 0.3, 30));
         let wall_transform = model_transform.times(Mat4.translation(0, 10, -10, 1)).times(Mat4.scale(25, 30, 0.3));
 
 
-        this.shapes.range.draw(context, program_state, floor_transform, this.materials.range2);
+            this.shapes.range.draw(context, program_state, floor_transform, this.materials.range2);
 
-        this.shapes.range.draw(context, program_state, wall_transform, this.materials.range2);
+            this.shapes.range.draw(context, program_state, wall_transform, this.materials.range2);
 
 
         let wall_transform_2 = model_transform.times(Mat4.translation(20, 10, -10)).times(Mat4.scale(0.3, 30, 50));
 
-        this.shapes.range.draw(context, program_state, wall_transform_2, this.materials.range2);
+            this.shapes.range.draw(context, program_state, wall_transform_2, this.materials.range2);
 
         wall_transform_2 = wall_transform_2.times(Mat4.scale(10/3, 1/30, 1/50)).times(Mat4.translation(-40,0,0))
                                             .times(Mat4.scale(0.3, 30, 50));
 
-        this.shapes.range.draw(context, program_state, wall_transform_2, this.materials.range2);
+            this.shapes.range.draw(context, program_state, wall_transform_2, this.materials.range2);
 
 
 
@@ -239,14 +272,12 @@ export class ShootingRange extends Scene {
 
 
         
-        //targets
+//DRAW TARGETS///////////////////////////////////////////////////////////////////////////////////////////////////////////
         const hover = 0.1*Math.sin(2*t);
         let target1 = model_transform.times(Mat4.translation(-15, 9 + hover, -9));
         let target2 = model_transform.times(Mat4.translation(0, 9 + hover, -9));
         let target3 = model_transform.times(Mat4.translation(15, 9 + hover, -9));
-
-
-
+        let target4 = model_transform.times(Mat4.translation(12, 9 + hover, -9));
 
         const periodic = Math.cos(Math.PI*t/5);
 
@@ -254,11 +285,12 @@ export class ShootingRange extends Scene {
         let color_changer_2 = color(0.5+(0.5*periodic),0,0.5-(0.5*periodic),1);
         let color_changer_3 = color(0.5-(0.5*periodic),0.5+(0.5*periodic),0.5-(0.5*periodic),1);
 
-        this.shapes.target.draw(context, program_state, target1, this.materials.target.override({color: color_changer}));
-        this.shapes.target.draw(context, program_state, target2, this.materials.target.override({color: color_changer_2}));
-        this.shapes.target.draw(context, program_state, target3, this.materials.target.override({color: color_changer_3}));
+        this.target_list[0].draw(context, program_state, target1, this.materials.target.override({color: color_changer}));
+        this.target_list[1].draw(context, program_state, target2, this.materials.target.override({color: color_changer_2}));
+        this.target_list[2].draw(context, program_state, target3, this.materials.target.override({color: color_changer_3}));
+        this.target_list[3].draw(context, program_state, target4, this.materials.target.override({color: color_changer}));
 
-     // display time
+//DISPLAY TIME/////////////////////////////////////////////////////////////////////////////////////////////////////
         let time = 30 - t;
         if (time >=0){
             time = time.toPrecision(4);
@@ -273,12 +305,12 @@ export class ShootingRange extends Scene {
             this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-8, 26, 0)), this.materials.text_image);
 
 
-        // draw the gun
+//DRAW THE GUN//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         let model_transform_gun = model_transform.times(Mat4.translation(0, 8.8, 47.5)).times(Mat4.rotation(Math.PI, 0, 1, 0)).times(Mat4.rotation(0.04, 1, 0, 0));
 
 
 
-         //console.log(defs.canvas_mouse_pos);
+    //GET MOUSE POSITION FROM CANVAS////////////////////////
 
          let mouse_x = 0;
          let mouse_y = 0;
@@ -288,25 +320,7 @@ export class ShootingRange extends Scene {
              mouse_y = defs.canvas_mouse_pos.dot(vec(0, 1));
          }
 
-         let x = (2*mouse_x)/1080-1;
-         let y = 1 - (2*mouse_y)/600;
-         let z = -1;
-
-         let ray_nds = vec3(x,y,z);
-
-         let ray_clip = ray_nds.to4(true);
-
-         let ray_eye = ray_clip.times(Mat4.inverse(program_state.projection_transform));
-
-         ray_eye[2] = -1;
-         ray_eye[3] = 0;
-
-         let ray_wor = ray_eye.times(program_state.camera_inverse);
-
-         ray_wor.normalize();
-
-        console.log(mouse_x + ',' + mouse_y);
-        console.log(ray_wor.dot(vec4(1,0,0,0)) + ',' + ray_clip.dot(vec4(0,1,0,0)) + ',' + ray_clip.dot(vec4(0,0,1,0)));
+        console.log(this.target_list); //We can call the SCORE using static member of Target Class
 
 
         model_transform_gun = model_transform_gun.times(Mat4.translation(3*mouse_x/540,0,0))
