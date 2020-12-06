@@ -95,12 +95,7 @@ class Target extends defs.Subdivision_Sphere{
     }
 
     draw(webgl_manager, program_state, model_transform, material, type = "TRIANGLES"){//need to override draw() function from parent
-        //if(!this.isShot){ //if not shot, draw , else nothing happens => the target disappears from canvas since it's not being drawn.
-            super.draw(webgl_manager, program_state, model_transform, material, type = "TRIANGLES");
-        //}
-//         else if(program_state.animation_time - this.timeShot < 5000){
-//             super.draw(webgl_manager, program_state, model_transform.times(Mat4.scale(1.2, 1.2, 1.2)), material.override({color: this.color_changer[0]}));
-//         }    
+        super.draw(webgl_manager, program_state, model_transform, material, type = "TRIANGLES");    
 
     }
 
@@ -108,7 +103,7 @@ class Target extends defs.Subdivision_Sphere{
     {
             this.isShot = true;//set status of shot to true
             Target.SCORE += this.level; //add to static member SCORE based on level, lvl 1 adds 1, lvl 2 adds 2, and so on
-            this.timeShot = this.t;
+            this.timeShot = this.t; // record when target was shot
     }
 
     
@@ -356,10 +351,10 @@ export class ShootingRange extends Scene {
         var index = 0;
         for(var j = 0; j < 3; j++){ // number of z planes consisting of targets
             for(var i = 0; i < 9; i++){ // number of targets along the y axis on a given z plane
-                
                 // draw all targets in target_list that aren't shot:
                 if(!this.target_list[index].isShot){ 
-                    if(t > 10){ // tests if we are in level 2
+                    // test if we are in level 2. if so, move target and slowly decrease its size until a certain point:
+                    if(t > 10){ // adjust right side to control when game transitions from level 1 to level 2
                         if(this.target_list[index].x_location > 18 || this.target_list[index].x_location < -18)
                             this.target_list[index].move_right ^= true; // change direction of motion if needed
                         
