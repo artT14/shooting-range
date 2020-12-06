@@ -84,16 +84,23 @@ export class Text_Line extends Shape {                           // **Text_Line*
 /////////////////////////////////////////////////////////////////////////////////------------------------------------------
 class Target extends defs.Subdivision_Sphere{
     static SCORE = 0;
+    static SCALE_FACTOR = 1.0;
     constructor(level){ //pass in level in constructor, RECOMMEND USE 1-3, for 3 different levels
         super(3-level); //lvl = 1 => subdivs of 2, lvl = 2 => subdivs of 1, lvl = 3 or greater => subdivs of 0
         this.level = level; //in case you need the level of the object, might be useful into adding time when an Target is shot
         this.isShot = false; //in case you need to check whether a target has been shot, might be useful in adding time to timer when a target is shot
+        this.x_location = Math.floor(Math.random()*36) - 18 // generates a random initial location along x axis for the target
+        this.move_right = Math.random() < 0.5; // generate a random boolean to determine direction of motion
+        this.timeShot = 0.0; // records when the target was shot
     }
 
     draw(webgl_manager, program_state, model_transform, material, type = "TRIANGLES"){//need to override draw() function from parent
-        if(!this.isShot){ //if not shot, draw , else nothing happens => the target disappears from canvas since it's not being drawn.
+        //if(!this.isShot){ //if not shot, draw , else nothing happens => the target disappears from canvas since it's not being drawn.
             super.draw(webgl_manager, program_state, model_transform, material, type = "TRIANGLES");
-        }
+        //}
+//         else if(program_state.animation_time - this.timeShot < 5000){
+//             super.draw(webgl_manager, program_state, model_transform.times(Mat4.scale(1.2, 1.2, 1.2)), material.override({color: this.color_changer[0]}));
+//         }    
 
     }
 
@@ -101,6 +108,7 @@ class Target extends defs.Subdivision_Sphere{
     {
             this.isShot = true;//set status of shot to true
             Target.SCORE += this.level; //add to static member SCORE based on level, lvl 1 adds 1, lvl 2 adds 2, and so on
+            this.timeShot = this.t;
     }
 
     
@@ -130,8 +138,6 @@ export class ShootingRange extends Scene {
 
 //////////////TARGET LIST ARRAY, we can use array to push targets when we want to create new one and pop them out when they are no longer in use e.g. shot
         this.target_list = [
-            new (Target.prototype.make_flat_shaded_version())(3), //<= args is the level of the target
-            new (Target.prototype.make_flat_shaded_version())(2), //<= args is the level of the target
             new (Target.prototype.make_flat_shaded_version())(1), //<= args is the level of the target
             new (Target.prototype.make_flat_shaded_version())(1),
             new (Target.prototype.make_flat_shaded_version())(1),
@@ -139,7 +145,28 @@ export class ShootingRange extends Scene {
             new (Target.prototype.make_flat_shaded_version())(1),
             new (Target.prototype.make_flat_shaded_version())(1),
             new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
+            new (Target.prototype.make_flat_shaded_version())(1),
         ];
+
 
         //this.target_list.push(new (Target.prototype.make_flat_shaded_version())(3)); =>can push in new target using this...
                 //...method in display func but make sure that it is only called on using an if statement
@@ -326,17 +353,71 @@ export class ShootingRange extends Scene {
         
 //DRAW TARGETS///////////////////////////////////////////////////////////////////////////////////////////////////////////
         const hover = 0.1*Math.sin(2*t);
-        let target1 = model_transform.times(Mat4.translation(-15, 9 + hover, -9));
-        let target2 = model_transform.times(Mat4.translation(0, 9 + hover, -9));
-        let target3 = model_transform.times(Mat4.translation(15, 9 + hover, -9));
+        var index = 0;
+        for(var j = 0; j < 3; j++){ // number of z planes consisting of targets
+            for(var i = 0; i < 9; i++){ // number of targets along the y axis on a given z plane
+                
+                // draw all targets in target_list that aren't shot:
+                if(!this.target_list[index].isShot){ 
+                    if(t > 10){ // tests if we are in level 2
+                        if(this.target_list[index].x_location > 18 || this.target_list[index].x_location < -18)
+                            this.target_list[index].move_right ^= true; // change direction of motion if needed
+                        
+                        if(this.target_list[index].move_right){
+                            this.target_list[index].x_location += 0.03; // adjust right side to control how fast objects move
+                        }
+                        else{
+                            this.target_list[index].x_location -= 0.03; // same as above
+                        }
 
+                        if(Target.SCALE_FACTOR > 0.5){ // adjust right side to control minimum size of targets
+                            Target.SCALE_FACTOR -= 0.00001; // adjust right side to control how fast targets get smaller as time goes on
+                        }
+                            
+                    }
+                    let target_transform = model_transform.times(Mat4.translation(this.target_list[index].x_location, 2 + i * 3 + hover, -9 + j * 6))
+                        .times(Mat4.scale(Target.SCALE_FACTOR, Target.SCALE_FACTOR, Target.SCALE_FACTOR));
+                    this.target_list[index].draw(context, program_state, target_transform, this.materials.target);
+                    this.target_list[index].t = program_state.animation_time;
+                }
 
+                // if target was recently shot, increase target in size for a short time before making it disappear:
+                else if(program_state.animation_time - this.target_list[index].timeShot < 1000){ // adjust right side to control how long target increases in size before disappearing
+                    let delta_t = (program_state.animation_time - this.target_list[index].timeShot) / 2000; // adjust denominator to control the rate at which target increases in size before disappearing
+                    let target_transform = model_transform.times(Mat4.translation(this.target_list[index].x_location, 2 + i * 3 + hover, -9 + j * 6))
+                        .times(Mat4.scale(Target.SCALE_FACTOR + delta_t, Target.SCALE_FACTOR + delta_t, Target.SCALE_FACTOR + delta_t));
+                    this.target_list[index].draw(context, program_state, target_transform, this.materials.target.override({ambient: .3, color: this.color_changer[1]}));
+                }
 
-        this.target_list[0].draw(context, program_state, target1, this.materials.target);
-        this.target_list[1].draw(context, program_state, target2, this.materials.target);
-        this.target_list[2].draw(context, program_state, target3, this.materials.target);
-//DRAW IDLE TARGETS
+                // make a new target in place of old target after a short while:
+                else if(program_state.animation_time - this.target_list[index].timeShot > 2000){
+                    this.target_list.splice(index, 1, new (Target.prototype.make_flat_shaded_version())(t > 10 ? 2 : 1)); // if 10 seconds has passed, make level 2 targets instead of level 1
+                }
+                index++;
+            }
+        }
+        
 
+        // tests behavior of targets after being shot:
+//         if(t > 5 && t < 5.5)
+//             this.target_list[0].shoot();
+
+//         if(t > 11 && t < 11.5){
+//             this.target_list[1].shoot();
+//             this.target_list[2].shoot();
+//             this.target_list[3].shoot();
+//             this.target_list[4].shoot();
+//             this.target_list[5].shoot();
+//             this.target_list[6].shoot();
+//             this.target_list[7].shoot();
+//             this.target_list[8].shoot();
+//         }
+
+//         if(t > 20 && t < 20.5){
+//             this.target_list[1].shoot();
+//             this.target_list[2].shoot();
+//             this.target_list[3].shoot();
+//         }
 
 
 
