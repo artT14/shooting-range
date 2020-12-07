@@ -2,7 +2,7 @@ import {defs, tiny} from './examples/common.js';
 import {Shape_From_File} from './examples/obj-file-demo.js';
 
 const {
-    Vector, Vector3, vec, vec3, vec4, color, hex_color, Shader, Matrix, Mat4, Light, Shape, Material, Scene, Texture
+    Vector, Vector3, vec, vec3, vec4, color, hex_color, Shader, Matrix, Mat4, Light, Shape, Material, Scene, Texture, Graphics_Card_Object
 } = tiny;
 
 const {Cube, Axis_Arrows, Textured_Phong} = defs
@@ -86,17 +86,20 @@ class Target extends defs.Subdivision_Sphere{
     static SCORE = 0;
     static SCALE_FACTOR = 1.0;
     constructor(level){ //pass in level in constructor, RECOMMEND USE 1-3, for 3 different levels
+                             //pass in a unique key for each target as well; this is automatically generated 
         super(3-level); //lvl = 1 => subdivs of 2, lvl = 2 => subdivs of 1, lvl = 3 or greater => subdivs of 0
         this.level = level; //in case you need the level of the object, might be useful into adding time when an Target is shot
         this.isShot = false; //in case you need to check whether a target has been shot, might be useful in adding time to timer when a target is shot
+        
         this.x_location = Math.floor(Math.random()*36) - 18 // generates a random initial location along x axis for the target
         this.move_right = Math.random() < 0.5; // generate a random boolean to determine direction of motion
         this.timeShot = 0.0; // records when the target was shot
     }
 
     draw(webgl_manager, program_state, model_transform, material, type = "TRIANGLES"){//need to override draw() function from parent
-        super.draw(webgl_manager, program_state, model_transform, material, type = "TRIANGLES");    
-
+        //if(!this.isShot){ //if not shot, draw , else nothing happens => the target disappears from canvas since it's not being drawn.
+            super.draw(webgl_manager, program_state, model_transform, material, type = "TRIANGLES");
+        //}
     }
 
     shoot() //when this function is called, the object is considered to be shot, once it's shot, it also adds to the SCORE
@@ -106,6 +109,77 @@ class Target extends defs.Subdivision_Sphere{
             this.timeShot = this.t; // record when target was shot
     }
 
+    // render draws each target object twice: once to the offscreen framebuffer, once to the onscreen framebuffer
+    render(webgl_manager, program_state, model_transform, material1, material2, type = "TRIANGLES", framebuffer, renderbuffer, texture){
+        const gl = webgl_manager.context;
+
+        //material 1 is offscreen (white for trial)
+        //material 2 is onscreen (black)
+
+        //bind framebuffer to read offscreen framebuffer
+         
+         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+             
+
+        //gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        //gl.uniform1i(program_state.uOffscreen, true);
+        //draw offscreen
+        
+            this.draw(webgl_manager, program_state, model_transform, material1, type = "TRIANGLES");
+        
+            
+
+        //onscreen rendering: draw to default onscreen buffer
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        //gl.uniform1i(program_state.uOffscreen, false);
+        //draw onscreen
+        
+            this.draw(webgl_manager, program_state, model_transform, material2, type = "TRIANGLES");
+        
+
+        
+                 
+     }
+
+    check_if_shot(readout, key){
+         
+         //compare
+         if(this.compare(readout, key)){
+                this.shoot();
+         }
+
+         return true;
+
+    }
+    //get readout; will be in vals 0-256
+    get_readout(webgl_manager, framebuffer, renderbuffer, texture, x, y){
+        const gl = webgl_manager.context;
+
+        var readout = new Uint8Array(1*1*4);
+
+         //bind framebuffer to read offscreen framebuffer
+
+         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+
+         //read the pixel
+         gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, readout);
+
+         //bind back to onscreen framebuffer
+         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+         return readout;
+
+    }
+
+    //comparison: if difference is less than 1, we have a hit
+    compare(readout, key){
+        console.log('readout', readout);
+        console.log('key', key);
+        return (Math.abs(Math.round(key[0]*255) - readout[0]) <= 1 &&
+            Math.abs(Math.round(key[1]*255) - readout[1]) <= 1 &&
+            Math.abs(Math.round(key[2]*255) - readout[2]) <= 1);
+    }
+
     
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////-----------------------------------------------------------
@@ -113,7 +187,7 @@ class Target extends defs.Subdivision_Sphere{
 export class ShootingRange extends Scene {
     constructor() {
         // constructor(): Scenes begin by populating initial values like the Shapes and Materials they'll need.
-        super();
+        super();   
 
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
@@ -131,7 +205,19 @@ export class ShootingRange extends Scene {
         this.shapes.cylinder.arrays.texture_coord.map(function(x){return x.scale_by(0.5);});
         this.shapes.range.arrays.texture_coord.map(function(x){return x.scale_by(2);});
 
+///////////OFFSCREEN FRAMEBUFFER/////////////////////////////////////////////////////////////////////////////////////
+        //make offscreen texture and framebuffer:
+        this.offscreen_buffer = new Offscreen_Framebuffer;
+
+        
+
 //////////////TARGET LIST ARRAY, we can use array to push targets when we want to create new one and pop them out when they are no longer in use e.g. shot
+//         this.target_key_list = [
+            
+//         ]
+        
+        this.keys = [];
+
         this.target_list = [
             new (Target.prototype.make_flat_shaded_version())(1), //<= args is the level of the target
             new (Target.prototype.make_flat_shaded_version())(1),
@@ -162,6 +248,29 @@ export class ShootingRange extends Scene {
             new (Target.prototype.make_flat_shaded_version())(1),
         ];
 
+        //generate unique keys
+        for (let i = 0; i < this.target_list.length; i++)
+        {
+            //make key
+            var random_key = this.key_generator();
+
+            //if the key is not unique, keep generating new keys until it is unique
+            while(!this.is_unique(random_key)){
+                random_key = this.key_generator;
+            }
+
+            //if key is unique, push it onto the list
+            this.keys.push(random_key);
+        }
+
+        //output key values for debugging 
+        var id = [];
+        for (let j = 0; j < this.keys.length; j++){
+            let val = vec3(Math.abs(Math.round(this.keys[j][0]*255)), Math.abs(Math.round(this.keys[j][1]*255)), Math.abs(Math.round(this.keys[j][2]*255)));
+            id.push(val);
+        }
+        console.log(id);
+        console.log(this.keys)
 
         //this.target_list.push(new (Target.prototype.make_flat_shaded_version())(3)); =>can push in new target using this...
                 //...method in display func but make sure that it is only called on using an if statement
@@ -176,6 +285,7 @@ export class ShootingRange extends Scene {
                 {ambient: .7, diffusivity: .6, color: color(1, 0, 0, 1)}),
             target: new Material(new defs.Phong_Shader(),
                 {ambient: 0, diffusivity: .6, specularity: 1.0, color: color(0, 0, 0, 1)}),
+
             text_image: new Material(texture, {
                 ambient: 1, diffusivity: 0, specularity: 0,
                 texture: new Texture("assets/text.png")}),
@@ -201,6 +311,9 @@ export class ShootingRange extends Scene {
                 ambient: 1, diffusivity: 0, specularity: 0,
                 texture: new Texture("assets/flash.png","LINEAR_MIPMAP_LINEAR")
             }),
+
+            offscreen_target: new Material(new key_color(),
+               {ambient: 1, diffusivity: 0, specularity: 0, color: color(1, 1, 1, 1)}),
                
         }
         
@@ -218,8 +331,29 @@ export class ShootingRange extends Scene {
         // addEventListener('mousedown', this.mouse_picking); //this works so mouse_picking is called when you click the left mouse button
     }
 
+    //generates a random color
+    key_generator(){
+            let key = color(Math.random(), Math.random(), Math.random(), 1);
+            return key;
+    }
+
+    //go through all existing keys and return false if the given key is already present
+    //colors are given in decimal values, so convert them to a 0-256 scale, which gl.readPixels uses
+    //colors need to be unique in the 0-256 scale so picking will work on different colors 
+    is_unique(key){
+        for (let i = 0; i < this.keys.length; i++)
+        {
+            if ((Math.abs(Math.round(key[0]*255)) == Math.abs(Math.round(this.keys[0]*255))) && 
+            (Math.abs(Math.round(key[1]*255)) == Math.abs(Math.round(this.keys[1]*255))) &&
+            (Math.abs(Math.round(key[2]*255)) == Math.abs(Math.round(this.keys[2]*255)))){
+                return false;
+            }
+        }
+        return true;
+    }
+
    // only called if you click the left mouse button
-    mouse_picking(context, program_state, model_transform){
+    mouse_picking(context, program_state, model_transform, framebuffer, renderbuffer, texture){
         
         this.CLICK = false;
 
@@ -234,39 +368,31 @@ export class ShootingRange extends Scene {
             mouse_y = defs.canvas_mouse_pos.dot(vec(0, 1));
         }
 
-//         mouse_x = mouse_x + 540;
-//         mouse_y = (-mouse_y) + 300;
+         mouse_x = mouse_x + 540;
+         mouse_y = (-mouse_y) + 300;
 
         
         let x = ((2.0 * mouse_x) / 1080.0) - 1.0;
         let y = 1.0 - ((2.0 * mouse_y) / 600.0);
         let mouse_view = vec4(x, y, -1, 1);
 
-
-        // projection matrix
-           let projection_matrix = Mat4.perspective(
-            Math.PI / 4, context.width / context.height, .1, 1000);;
+        console.log('mouse', mouse_view);
+       
         
-        // eye matrix
-           let eye_matrix = Mat4.look_at(vec3(0, 10, 50), vec3(0, 8, 0), vec3(0, 1, 0));
-
-        // convert: (doesn't work yet)
-        let ray_eye = Mat4.inverse(projection_matrix).times(mouse_view);
-        ray_eye = vec4(ray_eye.xy, -1, 0);
-
-        let ray_world = (Mat4.inverse(eye_matrix).times(ray_eye));
-        //ray_world = ray_world.normalize();
-
-        
-        let world_point = Mat4.inverse(eye_matrix).times(Mat4.inverse(projection_matrix).times(mouse_view));
-        //console.log(eye_matrix);
-
-        console.log(mouse_view);
-        
-        //draw a ray 
-        this.shapes.ray.draw(context, program_state, model_transform, this.materials.ray, "LINES");
+        let readout = this.target_list[0].get_readout(context, framebuffer, renderbuffer, texture, mouse_x, mouse_y);
+        console.log('readout', readout);
+        //check if pixel under mouse is part of target
+        for (let i=0; i < this.target_list.length; i++)
+        {
+            this.target_list[i].check_if_shot(readout, this.keys[i]);
+        }
 
     }
+
+   
+
+
+    
 
     display(context, program_state) {
         // display():  Called once per frame of animation.
@@ -297,13 +423,13 @@ export class ShootingRange extends Scene {
         program_state.projection_transform = Mat4.perspective(
             Math.PI / 4, context.width / context.height, .1, 1000);
         
-
         
-
+        this.offscreen_buffer.make_buffer(context);
+        this.offscreen_buffer.clear(context);
+        const framebuffer = this.offscreen_buffer.return_framebuffer();
+        const renderbuffer = this.offscreen_buffer.return_renderbuffer();
+        const texture = this.offscreen_buffer.return_texture();
        
-    
-        // makes up a preliminary scene
-        // will clean it up when we implement mouse picking
         let score = 0;
 
 //DRAW RANGE FLOORS AND WALL ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -311,7 +437,7 @@ export class ShootingRange extends Scene {
         let wall_transform = model_transform.times(Mat4.translation(0, 10, -10, 1)).times(Mat4.scale(25, 30, 0.3));
 
 
-            this.shapes.range.draw(context, program_state, floor_transform, this.materials.range1);
+            this.shapes.range.draw(context, program_state, floor_transform, this.materials.range2.override({color: this.color_changer[0]}));
 
             this.shapes.range.draw(context, program_state, wall_transform, this.materials.range2.override({color: this.color_changer[0]}));
 
@@ -347,6 +473,24 @@ export class ShootingRange extends Scene {
 
         
 //DRAW TARGETS///////////////////////////////////////////////////////////////////////////////////////////////////////////
+        
+//         const hover = 0.1*Math.sin(2*t);
+//         let target1 = model_transform.times(Mat4.translation(-15, 9 + hover, -9));
+//         let target2 = model_transform.times(Mat4.translation(0, 9 + hover, -9));
+//         let target3 = model_transform.times(Mat4.translation(15, 9 + hover, -9));
+
+        //var position = [target1, target2, target3];
+        //var positions = [target1, target2];
+
+        //first material is offscreen, second material is onscreen
+       
+        //this.offscreen_buffer.render(this.target_list, positions, context, program_state, this.materials.offscreen_target, this.materials.target,
+        //"TRIANGLES")
+       // for(let i = 0; i < this.target_list.length; i++){
+//             this.target_list[i].render(context, program_state, positions[i], this.materials.offscreen_target.override({color: this.keys[i]}), this.materials.target, "TRIANGLES",
+//              framebuffer, renderbuffer, texture);
+       //}
+        
         const hover = 0.1*Math.sin(2*t);
         var index = 0;
         for(var j = 0; j < 3; j++){ // number of z planes consisting of targets
@@ -372,7 +516,10 @@ export class ShootingRange extends Scene {
                     }
                     let target_transform = model_transform.times(Mat4.translation(this.target_list[index].x_location, 2 + i * 3 + hover, -9 + j * 6))
                         .times(Mat4.scale(Target.SCALE_FACTOR, Target.SCALE_FACTOR, Target.SCALE_FACTOR));
-                    this.target_list[index].draw(context, program_state, target_transform, this.materials.target);
+                    //draw the target in onscreen framebuffer and offscreen framebuffer using render()
+                    this.target_list[index].render(context, program_state, target_transform, this.materials.offscreen_target.override({color: this.keys[index]}), this.materials.target, "TRIANGLES",
+             framebuffer, renderbuffer, texture);
+                    //this.target_list[index].draw(context, program_state, target_transform, this.materials.target);
                     this.target_list[index].t = program_state.animation_time;
                 }
 
@@ -392,27 +539,17 @@ export class ShootingRange extends Scene {
             }
         }
         
+        //Notes:
+        // - Scene does not have context, but WebGL_Manager does
+        // - WebGL_Manager calls display() and uses its context
+        // this is why we cannot use this context to do anything useful
+        
+      
+        
+       
 
-        // tests behavior of targets after being shot:
-//         if(t > 5 && t < 5.5)
-//             this.target_list[0].shoot();
+//DRAW IDLE TARGETS
 
-//         if(t > 11 && t < 11.5){
-//             this.target_list[1].shoot();
-//             this.target_list[2].shoot();
-//             this.target_list[3].shoot();
-//             this.target_list[4].shoot();
-//             this.target_list[5].shoot();
-//             this.target_list[6].shoot();
-//             this.target_list[7].shoot();
-//             this.target_list[8].shoot();
-//         }
-
-//         if(t > 20 && t < 20.5){
-//             this.target_list[1].shoot();
-//             this.target_list[2].shoot();
-//             this.target_list[3].shoot();
-//         }
 
 
 
@@ -458,7 +595,7 @@ export class ShootingRange extends Scene {
 
 
 
-        this.shapes.gun.draw(context,program_state, model_transform_gun,this.materials.gun_material);
+        this.shapes.gun.draw(context, program_state, model_transform_gun,this.materials.gun_material);
 
 
 
@@ -468,14 +605,7 @@ export class ShootingRange extends Scene {
         //this.shapes.ray.draw(context, program_state, model_transform_gun, this.materials.ray, "LINES");
 
 
-        //test target at origin, delete later
-
-        
-//         const once = {
-//             once : true;
-//         };
-
-       // addEventListener('click', this.mouse_picking, once);
+       
         var canvas = document.getElementById('main-canvas');
         canvas.addEventListener('click', () => {
             this.CLICK = true;
@@ -487,7 +617,7 @@ export class ShootingRange extends Scene {
             console.log(shoot);
             model_transform_gun = model_transform_gun.times(Mat4.translation(0,0,3)).times(Mat4.scale(0.25,0.25,0))
             this.shapes.muzzle.draw(context,program_state, model_transform_gun,this.materials.muzzleFlash);
-            this.mouse_picking(context, program_state, model_transform);
+            this.mouse_picking(context, program_state, model_transform, framebuffer, renderbuffer, texture);
         }
 
 
@@ -496,10 +626,318 @@ export class ShootingRange extends Scene {
     }
 }
 
+////////////////OFFSCREEN NEW TEXTURE AND FRAMEBUFFER///////////////////////////////////////////////////////////
+class Offscreen_Framebuffer extends Graphics_Card_Object {
+    constructor(){
+        super();
+        this.framebuffer = null;
+        this.texture = null;
+        this.renderbuffer = null;
+    }
+
+    make_buffer(webgl_manager) {
+        //make offscreen texture to store colors 
+            //only want to store colors of the scene, so texture size is size of canvas 
+            //don't actually use this texture to draw anything; the colors (unique id's) are drawn here 
+        const gl = webgl_manager.context;
+        
+        var width = 1080;
+        var height = 600;
+
+            //make texture
+        this.texture = gl.createTexture();
+            //bind texture, but do not bind an image to the texture 
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    
+
+    
+        //make renderbuffer (z-buffer) and attach it to framebuffer
+            //size is same as texture
+            //for every pixel in framebuffer, store depth and color
+        this.renderbuffer = gl.createRenderbuffer();
+        gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+        
+        //make offscreen framebuffer: attach texture and renderbuffer to this framebuffer
+        this.framebuffer = gl.createFramebuffer();
+            //make this framebuffer this current framebuffer
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+            //bind texture to framebuffer
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+            //bind renderbuffer to framebuffer
+        gl.enable(gl.DEPTH_TEST);
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.renderbuffer);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+ 
+        //troubleshooting
+         if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
+            const error = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+            console.log('this combination of attachments does not work');
+            console.log(error);
+            console.log(width, height);
+            return;
+         }
+    
+        //cleanup: unbind this offscreen framebuffer so we go back to onscreen framebuffer 
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);  
+
+
+    }
+
+    return_framebuffer() {
+        return this.framebuffer;
+    }
+
+    return_renderbuffer() {
+        return this.renderbuffer;
+    }
+
+    return_texture(){
+        return this.texture;
+    }
+
+    clear(webgl_manager) {
+        const gl = webgl_manager.context;
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    }
+
+//     // render draws each target object twice: once to the offscreen framebuffer, once to the onscreen framebuffer
+//     render(target_list, positions, webgl_manager, program_state, material1, material2, type = "TRIANGLES"){
+//         //this.make_buffer(webgl_manager);
+//         const gl = webgl_manager.context;
+
+//         //material 1 is offscreen (white for trial)
+//         //material 2 is onscreen (black)
+
+//         //offscreen rendering: draw to offscreen buffer
+//         //var canvas = document.getElementById('main-canvas');
+//         var width = 1080;
+//         var height = 600;
+
+//         //bind framebuffer to read offscreen framebuffer
+//          this.texture = gl.createTexture();
+//          gl.bindTexture(gl.TEXTURE_2D, this.texture);
+//          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+//          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+//          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+//          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+//          this.renderbuffer = gl.createRenderbuffer();
+//          gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
+
+
+//          gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+
+//          this.framebuffer = gl.createFramebuffer();
+//          gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+//              //bind texture to framebuffer
+//          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+         
+//          gl.enable(gl.DEPTH_TEST);
+
+//          //bind renderbuffer to framebuffer
+//          gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.renderbuffer);
+
+//          gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+ 
+//         //troubleshooting
+//          if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
+//             const error = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+//             console.log('this combination of attachments does not work');
+//             console.log(error);
+//             console.log(width, height);
+//             return;
+//          }
+        
+//         //draw offscreen
+//         for(let i = 0; i < target_list.length; i++){
+//             target_list[i].draw(webgl_manager, program_state, positions[i], material1, type = "TRIANGLES");
+//         }
+        
+            
+
+//         //onscreen rendering: draw to default onscreen buffer
+//         gl.bindTexture(gl.TEXTURE_2D, null);
+//         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+//         gl.bindFramebuffer(gl.FRAMEBUFFER, null); 
+//         //draw onscreen
+//        for(let i = 0; i < target_list.length; i++){
+//             target_list[i].draw(webgl_manager, program_state, positions[i], material2, type = "TRIANGLES");
+//         }
 
 
 
-// shaders from assignment 3 
+        
+                 
+//     }
+
+}
+
+
+    
+
+      //each target will have an (unseen) unique 'diffuse color', i.e. their unique identifier
+      //put unique colors in offscreen framebuffer 
+class key_color extends Shader {
+    constructor(num_lights = 2) {
+        super();
+        this.num_lights = num_lights;
+    }
+
+    shared_glsl_code() {
+        // ********* SHARED CODE, INCLUDED IN BOTH SHADERS *********
+        return ` 
+        precision mediump float;
+        const int N_LIGHTS = ` + this.num_lights + `;
+        uniform float ambient, diffusivity, specularity, smoothness;
+        uniform vec4 light_positions_or_vectors[N_LIGHTS], light_colors[N_LIGHTS];
+        uniform float light_attenuation_factors[N_LIGHTS];
+        uniform vec4 shape_color;
+        uniform vec3 squared_scale, camera_center;
+        // Specifier "varying" means a variable's final value will be passed from the vertex shader
+        // on to the next phase (fragment shader), then interpolated per-fragment, weighted by the
+        // pixel fragment's proximity to each of the 3 vertices (barycentric interpolation).
+        varying vec3 N, vertex_worldspace;
+        // ***** PHONG SHADING HAPPENS HERE: *****                                       
+        vec3 phong_model_lights( vec3 N, vec3 vertex_worldspace ){                                        
+            // phong_model_lights():  Add up the lights' contributions.
+            vec3 E = normalize( camera_center - vertex_worldspace );
+            vec3 result = vec3( 0.0 );
+            for(int i = 0; i < N_LIGHTS; i++){
+                // Lights store homogeneous coords - either a position or vector.  If w is 0, the 
+                // light will appear directional (uniform direction from all points), and we 
+                // simply obtain a vector towards the light by directly using the stored value.
+                // Otherwise if w is 1 it will appear as a point light -- compute the vector to 
+                // the point light's location from the current surface point.  In either case, 
+                // fade (attenuate) the light as the vector needed to reach it gets longer.  
+                vec3 surface_to_light_vector = light_positions_or_vectors[i].xyz - 
+                                               light_positions_or_vectors[i].w * vertex_worldspace;                                             
+                float distance_to_light = length( surface_to_light_vector );
+                vec3 L = normalize( surface_to_light_vector );
+                vec3 H = normalize( L + E );
+                // Compute the diffuse and specular components from the Phong
+                // Reflection Model, using Blinn's "halfway vector" method:
+                float diffuse  =      max( dot( N, L ), 0.0 );
+                float specular = pow( max( dot( N, H ), 0.0 ), smoothness );
+                float attenuation = 1.0 / (1.0 + light_attenuation_factors[i] * distance_to_light * distance_to_light );
+                
+                vec3 light_contribution = shape_color.xyz * light_colors[i].xyz * diffusivity * diffuse
+                                                          + light_colors[i].xyz * specularity * specular;
+                result += attenuation * light_contribution;
+            }
+            return result;
+        } `;
+    }
+
+    vertex_glsl_code() {
+        // ********* VERTEX SHADER *********
+        return this.shared_glsl_code() + `
+            attribute vec3 position, normal;                            
+            // Position is expressed in object coordinates.
+            
+            uniform mat4 model_transform;
+            uniform mat4 projection_camera_model_transform;
+    
+            void main(){                                                                   
+                // The vertex's final resting place (in NDCS):
+                gl_Position = projection_camera_model_transform * vec4( position, 1.0 );
+                // The final normal vector in screen space.
+                N = normalize( mat3( model_transform ) * normal / squared_scale);
+                vertex_worldspace = ( model_transform * vec4( position, 1.0 ) ).xyz;
+            } `;
+    }
+
+    fragment_glsl_code() {
+        // ********* FRAGMENT SHADER *********
+        // A fragment is a pixel that's overlapped by the current triangle.
+        // Fragments affect the final image or get discarded due to depth.
+        return this.shared_glsl_code() + `
+            void main(){                                                           
+                // Compute an initial (ambient) color:
+                gl_FragColor = vec4( shape_color.xyz * ambient, shape_color.w );
+
+//                 if (uOffscreen){
+//                     gl_FragColor = uMaterialDiffuse;
+//                     return;
+//                 }
+            } `;
+    }
+
+    send_material(gl, gpu, material) {
+        // send_material(): Send the desired shape-wide material qualities to the
+        // graphics card, where they will tweak the Phong lighting formula.
+        gl.uniform4fv(gpu.shape_color, material.color);
+        gl.uniform1f(gpu.ambient, material.ambient);
+        gl.uniform1f(gpu.diffusivity, material.diffusivity);
+        gl.uniform1f(gpu.specularity, material.specularity);
+        gl.uniform1f(gpu.smoothness, material.smoothness);
+    }
+
+    send_gpu_state(gl, gpu, gpu_state, model_transform) {
+        // send_gpu_state():  Send the state of our whole drawing context to the GPU.
+        const O = vec4(0, 0, 0, 1), camera_center = gpu_state.camera_transform.times(O).to3();
+        gl.uniform3fv(gpu.camera_center, camera_center);
+        // Use the squared scale trick from "Eric's blog" instead of inverse transpose matrix:
+        const squared_scale = model_transform.reduce(
+            (acc, r) => {
+                return acc.plus(vec4(...r).times_pairwise(r))
+            }, vec4(0, 0, 0, 0)).to3();
+        gl.uniform3fv(gpu.squared_scale, squared_scale);
+        // Send the current matrices to the shader.  Go ahead and pre-compute
+        // the products we'll need of the of the three special matrices and just
+        // cache and send those.  They will be the same throughout this draw
+        // call, and thus across each instance of the vertex shader.
+        // Transpose them since the GPU expects matrices as column-major arrays.
+        const PCM = gpu_state.projection_transform.times(gpu_state.camera_inverse).times(model_transform);
+        gl.uniformMatrix4fv(gpu.model_transform, false, Matrix.flatten_2D_to_1D(model_transform.transposed()));
+        gl.uniformMatrix4fv(gpu.projection_camera_model_transform, false, Matrix.flatten_2D_to_1D(PCM.transposed()));
+
+        // Omitting lights will show only the material color, scaled by the ambient term:
+        if (!gpu_state.lights.length)
+            return;
+
+        const light_positions_flattened = [], light_colors_flattened = [];
+        for (let i = 0; i < 4 * gpu_state.lights.length; i++) {
+            light_positions_flattened.push(gpu_state.lights[Math.floor(i / 4)].position[i % 4]);
+            light_colors_flattened.push(gpu_state.lights[Math.floor(i / 4)].color[i % 4]);
+        }
+        gl.uniform4fv(gpu.light_positions_or_vectors, light_positions_flattened);
+        gl.uniform4fv(gpu.light_colors, light_colors_flattened);
+        gl.uniform1fv(gpu.light_attenuation_factors, gpu_state.lights.map(l => l.attenuation));
+    }
+
+    update_GPU(context, gpu_addresses, gpu_state, model_transform, material) {
+        // update_GPU(): Define how to synchronize our JavaScript's variables to the GPU's.  This is where the shader
+        // recieves ALL of its inputs.  Every value the GPU wants is divided into two categories:  Values that belong
+        // to individual objects being drawn (which we call "Material") and values belonging to the whole scene or
+        // program (which we call the "Program_State").  Send both a material and a program state to the shaders
+        // within this function, one data field at a time, to fully initialize the shader for a draw.
+
+        // Fill in any missing fields in the Material object with custom defaults for this shader:
+        const defaults = {color: color(0, 0, 0, 1), ambient: 0, diffusivity: 1, specularity: 1, smoothness: 40};
+        material = Object.assign({}, defaults, material);
+
+        this.send_material(context, gpu_addresses, material);
+        this.send_gpu_state(context, gpu_addresses, gpu_state, model_transform);
+    }
+}
+     
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+////////WALL TEXTURES/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 class Texture_Scroll_Y extends Textured_Phong {
     // TODO:  Modify the shader below (right now it's just the same fragment shader as Textured_Phong) for requirement #6.
@@ -566,4 +1004,6 @@ class Texture_Scroll_Y_OPP extends Textured_Phong {
         } `;
     }
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
