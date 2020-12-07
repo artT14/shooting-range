@@ -85,6 +85,8 @@ export class Text_Line extends Shape {                           // **Text_Line*
 class Target extends defs.Subdivision_Sphere{
     static SCORE = 0;
     static SCALE_FACTOR = 1.0;
+    static IS_GAME_OVER = false;
+    static FINAL_TIME = 0.0;
     constructor(level){ //pass in level in constructor, RECOMMEND USE 1-3, for 3 different levels
                              //pass in a unique key for each target as well; this is automatically generated 
         super(3-level); //lvl = 1 => subdivs of 2, lvl = 2 => subdivs of 1, lvl = 3 or greater => subdivs of 0
@@ -105,8 +107,9 @@ class Target extends defs.Subdivision_Sphere{
     shoot() //when this function is called, the object is considered to be shot, once it's shot, it also adds to the SCORE
     {
             this.isShot = true;//set status of shot to true
-            Target.SCORE += this.level; //add to static member SCORE based on level, lvl 1 adds 1, lvl 2 adds 2, and so on
             this.timeShot = this.t; // record when target was shot
+            if(!Target.IS_GAME_OVER)
+                Target.SCORE += this.level / 2; //add to static member SCORE based on level, lvl 1 adds 1, lvl 2 adds 2, and so on
     }
 
     // render draws each target object twice: once to the offscreen framebuffer, once to the onscreen framebuffer
@@ -503,10 +506,10 @@ export class ShootingRange extends Scene {
                             this.target_list[index].move_right ^= true; // change direction of motion if needed
                         
                         if(this.target_list[index].move_right){
-                            this.target_list[index].x_location += 0.03; // adjust right side to control how fast objects move
+                            this.target_list[index].x_location += 0.1; // adjust right side to control how fast objects move
                         }
                         else{
-                            this.target_list[index].x_location -= 0.03; // same as above
+                            this.target_list[index].x_location -= 0.1; // same as above
                         }
 
                         if(Target.SCALE_FACTOR > 0.5){ // adjust right side to control minimum size of targets
@@ -554,18 +557,19 @@ export class ShootingRange extends Scene {
 
 
 //DISPLAY TIME/////////////////////////////////////////////////////////////////////////////////////////////////////
-        let time = 30 - t;
-        if (time >=0){
-            time = time.toPrecision(4);
-            let line = "Time: " + time.toString(); 
+        let time = 30 - t + Target.SCORE;
+        Target.IS_GAME_OVER = time < 0;
+        if (Target.IS_GAME_OVER){
+            let line = "Final score: " + Target.FINAL_TIME.toString();
             this.shapes.text.set_string(line, context.context);
         }
         else{
-            let line = "Final score: " + score.toString();
+            time = time.toPrecision(4);
+            let line = "Time: " + time.toString(); 
             this.shapes.text.set_string(line, context.context);
+            Target.FINAL_TIME = t;
         }
-
-            this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-8, 26, 0)), this.materials.text_image);
+        this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-8, 26, 0)), this.materials.text_image);
 
 
 //DRAW THE GUN//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
