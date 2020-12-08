@@ -611,6 +611,18 @@ export class ShootingRange extends Scene {
 
        
         var canvas = document.getElementById('main-canvas');
+
+        //get context back if it gets lost
+        canvas.addEventListener('webglcontextlost', function(event) {
+            console.log('context lost')
+            event.preventDefault();
+        }, false);
+
+        //re-setup WebGL state and re-create resources when context restored
+        canvas.addEventListener('webglcontextrestored', this.offscreen_buffer.make_buffer(context), false);
+
+
+        //check for clicks
         canvas.addEventListener('click', () => {
             this.CLICK = true;
         });
@@ -623,6 +635,7 @@ export class ShootingRange extends Scene {
             this.shapes.muzzle.draw(context,program_state, model_transform_gun,this.materials.muzzleFlash);
             this.mouse_picking(context, program_state, model_transform, framebuffer, renderbuffer, texture);
         }
+
 
 
 
@@ -683,7 +696,6 @@ class Offscreen_Framebuffer extends Graphics_Card_Object {
             const error = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
             console.log('this combination of attachments does not work');
             console.log(error);
-            console.log(width, height);
             return;
          }
     
@@ -712,76 +724,6 @@ class Offscreen_Framebuffer extends Graphics_Card_Object {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     }
-
-//     // render draws each target object twice: once to the offscreen framebuffer, once to the onscreen framebuffer
-//     render(target_list, positions, webgl_manager, program_state, material1, material2, type = "TRIANGLES"){
-//         //this.make_buffer(webgl_manager);
-//         const gl = webgl_manager.context;
-
-//         //material 1 is offscreen (white for trial)
-//         //material 2 is onscreen (black)
-
-//         //offscreen rendering: draw to offscreen buffer
-//         //var canvas = document.getElementById('main-canvas');
-//         var width = 1080;
-//         var height = 600;
-
-//         //bind framebuffer to read offscreen framebuffer
-//          this.texture = gl.createTexture();
-//          gl.bindTexture(gl.TEXTURE_2D, this.texture);
-//          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-//          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-//          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-//          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-
-//          this.renderbuffer = gl.createRenderbuffer();
-//          gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
-
-
-//          gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
-
-//          this.framebuffer = gl.createFramebuffer();
-//          gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
-//              //bind texture to framebuffer
-//          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
-         
-//          gl.enable(gl.DEPTH_TEST);
-
-//          //bind renderbuffer to framebuffer
-//          gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.renderbuffer);
-
-//          gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
- 
-//         //troubleshooting
-//          if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
-//             const error = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-//             console.log('this combination of attachments does not work');
-//             console.log(error);
-//             console.log(width, height);
-//             return;
-//          }
-        
-//         //draw offscreen
-//         for(let i = 0; i < target_list.length; i++){
-//             target_list[i].draw(webgl_manager, program_state, positions[i], material1, type = "TRIANGLES");
-//         }
-        
-            
-
-//         //onscreen rendering: draw to default onscreen buffer
-//         gl.bindTexture(gl.TEXTURE_2D, null);
-//         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-//         gl.bindFramebuffer(gl.FRAMEBUFFER, null); 
-//         //draw onscreen
-//        for(let i = 0; i < target_list.length; i++){
-//             target_list[i].draw(webgl_manager, program_state, positions[i], material2, type = "TRIANGLES");
-//         }
-
-
-
-        
-                 
-//     }
 
 }
 
