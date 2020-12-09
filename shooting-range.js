@@ -2,7 +2,7 @@ import {defs, tiny} from './examples/common.js';
 import {Shape_From_File} from './examples/obj-file-demo.js';
 
 const {
-    Vector, Vector3, vec, vec3, vec4, color, hex_color, Shader, Matrix, Mat4, Light, Shape, Material, Scene, Texture, Graphics_Card_Object
+    Vector, Vector3, vec, vec3, vec4, color, hex_color, Shader, Matrix, Mat4, Light, Shape, Material, Scene, Texture, Graphics_Card_Object, Webgl_Manager
 } = tiny;
 
 const {Cube, Axis_Arrows, Textured_Phong} = defs
@@ -113,35 +113,26 @@ class Target extends defs.Subdivision_Sphere{
     }
 
     // render draws each target object twice: once to the offscreen framebuffer, once to the onscreen framebuffer
-    render(webgl_manager, program_state, model_transform, material1, material2, type = "TRIANGLES", framebuffer, renderbuffer, texture){
+    render(webgl_manager, program_state, model_transform, material1, material2, type = "TRIANGLES", framebuffer){
         const gl = webgl_manager.context;
 
         //material 1 is offscreen (white for trial)
         //material 2 is onscreen (black)
 
         //bind framebuffer to read offscreen framebuffer
-         
          gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-             
-
-        //gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-        //gl.uniform1i(program_state.uOffscreen, true);
+           
         //draw offscreen
-        
-            this.draw(webgl_manager, program_state, model_transform, material1, type = "TRIANGLES");
-        
-            
+            this.draw(webgl_manager, program_state, model_transform, material1, type = "TRIANGLES");  
+              
 
         //onscreen rendering: draw to default onscreen buffer
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        //gl.uniform1i(program_state.uOffscreen, false);
+        
         //draw onscreen
-        
             this.draw(webgl_manager, program_state, model_transform, material2, type = "TRIANGLES");
-        
-
-        
-                 
+           
+            
      }
 
     check_if_shot(readout, key){
@@ -155,7 +146,7 @@ class Target extends defs.Subdivision_Sphere{
 
     }
     //get readout; will be in vals 0-256
-    get_readout(webgl_manager, framebuffer, renderbuffer, texture, x, y){
+    get_readout(webgl_manager, framebuffer, x, y){
         const gl = webgl_manager.context;
 
         var readout = new Uint8Array(1*1*4);
@@ -176,8 +167,7 @@ class Target extends defs.Subdivision_Sphere{
 
     //comparison: if difference is less than 1, we have a hit
     compare(readout, key){
-        console.log('readout', readout);
-        console.log('key', key);
+        console.log('key', Math.round(key[0]*255), Math.round(key[1]*255), Math.round(key[2]*255));
         return (Math.abs(Math.round(key[0]*255) - readout[0]) <= 1 &&
             Math.abs(Math.round(key[1]*255) - readout[1]) <= 1 &&
             Math.abs(Math.round(key[2]*255) - readout[2]) <= 1);
@@ -188,7 +178,7 @@ class Target extends defs.Subdivision_Sphere{
 ////////////////////////////////////////////////////////////////////////////////////////////////////-----------------------------------------------------------
 
 export class ShootingRange extends Scene {
-    constructor() {
+    constructor(context) {
         // constructor(): Scenes begin by populating initial values like the Shapes and Materials they'll need.
         super();   
 
@@ -210,8 +200,8 @@ export class ShootingRange extends Scene {
 
 ///////////OFFSCREEN FRAMEBUFFER/////////////////////////////////////////////////////////////////////////////////////
         //make offscreen texture and framebuffer:
-        this.offscreen_buffer = new Offscreen_Framebuffer;
-
+        //this.offscreen_buffer = new Offscreen_Framebuffer();
+        //this.offscreen_buffer.make_buffer(context)
         
 
 //////////////TARGET LIST ARRAY, we can use array to push targets when we want to create new one and pop them out when they are no longer in use e.g. shot
@@ -356,7 +346,7 @@ export class ShootingRange extends Scene {
     }
 
    // only called if you click the left mouse button
-    mouse_picking(context, program_state, model_transform, framebuffer, renderbuffer, texture){
+    mouse_picking(context, program_state, model_transform, framebuffer){
         
         this.CLICK = false;
 
@@ -382,7 +372,7 @@ export class ShootingRange extends Scene {
         console.log('mouse', mouse_view);
        
         
-        let readout = this.target_list[0].get_readout(context, framebuffer, renderbuffer, texture, mouse_x, mouse_y);
+        let readout = this.target_list[0].get_readout(context, framebuffer, mouse_x, mouse_y);
         console.log('readout', readout);
         //check if pixel under mouse is part of target
         for (let i=0; i < this.target_list.length; i++)
@@ -406,6 +396,8 @@ export class ShootingRange extends Scene {
             program_state.set_camera(this.initial_camera_location);
         }
 
+        //context in display() is a webgl_manager 
+
         const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
 
         const periodic = Math.cos(Math.PI*t/5);
@@ -427,11 +419,14 @@ export class ShootingRange extends Scene {
             Math.PI / 4, context.width / context.height, .1, 1000);
         
         
-        this.offscreen_buffer.make_buffer(context);
-        this.offscreen_buffer.clear(context);
-        const framebuffer = this.offscreen_buffer.return_framebuffer();
-        const renderbuffer = this.offscreen_buffer.return_renderbuffer();
-        const texture = this.offscreen_buffer.return_texture();
+        const framebuffer = context.get_framebuffer();
+        const gl = context.context;
+
+        //clear the offscreen framebuffer each frame before drawing
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
        
         let score = 0;
 
@@ -474,6 +469,21 @@ export class ShootingRange extends Scene {
 
             this.shapes.cylinder.draw(context, program_state, cyl_trans, this.materials.cylinder);
 
+
+//DISPLAY TIME/////////////////////////////////////////////////////////////////////////////////////////////////////
+        let time = 30 - t + Target.SCORE;
+        Target.IS_GAME_OVER = time < 0;
+        if (Target.IS_GAME_OVER){
+            let line = "Final score: " + Target.FINAL_TIME.toString();
+            this.shapes.text.set_string(line, context.context);
+        }
+        else{
+            time = time.toPrecision(4);
+            let line = "Time: " + time.toString(); 
+            this.shapes.text.set_string(line, context.context);
+            Target.FINAL_TIME = t;
+        }
+        this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-8, 26, 0)), this.materials.text_image);
         
 //DRAW TARGETS///////////////////////////////////////////////////////////////////////////////////////////////////////////
         
@@ -498,7 +508,8 @@ export class ShootingRange extends Scene {
         var index = 0;
         for(var j = 0; j < 3; j++){ // number of z planes consisting of targets
             for(var i = 0; i < 9; i++){ // number of targets along the y axis on a given z plane
-                // draw all targets in target_list that aren't shot:
+                if (!Target.IS_GAME_OVER){
+                    // draw all targets in target_list that aren't shot:
                 if(!this.target_list[index].isShot){ 
                     // test if we are in level 2. if so, move target and slowly decrease its size until a certain point:
                     if(t > 10){ // adjust right side to control when game transitions from level 1 to level 2
@@ -519,10 +530,16 @@ export class ShootingRange extends Scene {
                     }
                     let target_transform = model_transform.times(Mat4.translation(this.target_list[index].x_location, 2 + i * 3 + hover, -9 + j * 6))
                         .times(Mat4.scale(Target.SCALE_FACTOR, Target.SCALE_FACTOR, Target.SCALE_FACTOR));
-                    //draw the target in onscreen framebuffer and offscreen framebuffer using render()
-                    this.target_list[index].render(context, program_state, target_transform, this.materials.offscreen_target.override({color: this.keys[index]}), this.materials.target, "TRIANGLES",
-             framebuffer, renderbuffer, texture);
-                    //this.target_list[index].draw(context, program_state, target_transform, this.materials.target);
+
+                    //draw the target in onscreen framebuffer and offscreen framebuffer
+                    //this.target_list[index].render(context, program_state, target_transform, this.materials.offscreen_target.override({color: this.keys[index]}), this.materials.target, "TRIANGLES",framebuffer);
+                    
+                    //draw offscreen
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+                    this.target_list[index].draw(context, program_state, target_transform, this.materials.offscreen_target.override({color: this.keys[index]}));
+
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                    this.target_list[index].draw(context, program_state, target_transform, this.materials.target);
                     this.target_list[index].t = program_state.animation_time;
                 }
 
@@ -539,13 +556,11 @@ export class ShootingRange extends Scene {
                     this.target_list.splice(index, 1, new (Target.prototype.make_flat_shaded_version())(t > 10 ? 2 : 1)); // if 10 seconds has passed, make level 2 targets instead of level 1
                 }
                 index++;
+                }
+                
             }
         }
         
-        //Notes:
-        // - Scene does not have context, but WebGL_Manager does
-        // - WebGL_Manager calls display() and uses its context
-        // this is why we cannot use this context to do anything useful
         
       
         
@@ -556,20 +571,7 @@ export class ShootingRange extends Scene {
 
 
 
-//DISPLAY TIME/////////////////////////////////////////////////////////////////////////////////////////////////////
-        let time = 30 - t + Target.SCORE;
-        Target.IS_GAME_OVER = time < 0;
-        if (Target.IS_GAME_OVER){
-            let line = "Final score: " + Target.FINAL_TIME.toString();
-            this.shapes.text.set_string(line, context.context);
-        }
-        else{
-            time = time.toPrecision(4);
-            let line = "Time: " + time.toString(); 
-            this.shapes.text.set_string(line, context.context);
-            Target.FINAL_TIME = t;
-        }
-        this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-8, 26, 0)), this.materials.text_image);
+
 
 
 //DRAW THE GUN//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -619,7 +621,7 @@ export class ShootingRange extends Scene {
         }, false);
 
         //re-setup WebGL state and re-create resources when context restored
-        canvas.addEventListener('webglcontextrestored', this.offscreen_buffer.make_buffer(context), false);
+        //canvas.addEventListener('webglcontextrestored', this.offscreen_buffer.make_buffer(context), false);
 
 
         //check for clicks
@@ -633,7 +635,7 @@ export class ShootingRange extends Scene {
             console.log(shoot);
             model_transform_gun = model_transform_gun.times(Mat4.translation(0,0,3)).times(Mat4.scale(0.25,0.25,0))
             this.shapes.muzzle.draw(context,program_state, model_transform_gun,this.materials.muzzleFlash);
-            this.mouse_picking(context, program_state, model_transform, framebuffer, renderbuffer, texture);
+            this.mouse_picking(context, program_state, model_transform, framebuffer);
         }
 
 
@@ -650,62 +652,70 @@ class Offscreen_Framebuffer extends Graphics_Card_Object {
         this.framebuffer = null;
         this.texture = null;
         this.renderbuffer = null;
+
+//         for (let name of ["webgl", "experimental-webgl", "webkit-3d", "moz-webgl"]) {
+//                 this.context = this.canvas.getContext(name);
+//                 if (this.context) break;
+//             }
+//             if (!this.context) throw "Canvas failed to make a WebGL context.";
+//             const gl = this.context;
+
     }
 
-    make_buffer(webgl_manager) {
-        //make offscreen texture to store colors 
-            //only want to store colors of the scene, so texture size is size of canvas 
-            //don't actually use this texture to draw anything; the colors (unique id's) are drawn here 
-        const gl = webgl_manager.context;
+//     make_buffer(webgl_manager) {
+//         //make offscreen texture to store colors 
+//             //only want to store colors of the scene, so texture size is size of canvas 
+//             //don't actually use this texture to draw anything; the colors (unique id's) are drawn here 
+//         const gl = webgl_manager.context;
         
-        var width = 1080;
-        var height = 600;
+//         var width = 1080;
+//         var height = 600;
 
-            //make texture
-        this.texture = gl.createTexture();
-            //bind texture, but do not bind an image to the texture 
-        gl.bindTexture(gl.TEXTURE_2D, this.texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+//             //make texture
+//         this.texture = gl.createTexture();
+//             //bind texture, but do not bind an image to the texture 
+//         gl.bindTexture(gl.TEXTURE_2D, this.texture);
+//         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+//         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+//         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+//         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     
 
     
-        //make renderbuffer (z-buffer) and attach it to framebuffer
-            //size is same as texture
-            //for every pixel in framebuffer, store depth and color
-        this.renderbuffer = gl.createRenderbuffer();
-        gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
-        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+//         //make renderbuffer (z-buffer) and attach it to framebuffer
+//             //size is same as texture
+//             //for every pixel in framebuffer, store depth and color
+//         this.renderbuffer = gl.createRenderbuffer();
+//         gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
+//         gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
         
-        //make offscreen framebuffer: attach texture and renderbuffer to this framebuffer
-        this.framebuffer = gl.createFramebuffer();
-            //make this framebuffer this current framebuffer
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
-            //bind texture to framebuffer
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
-            //bind renderbuffer to framebuffer
-        gl.enable(gl.DEPTH_TEST);
-        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.renderbuffer);
+//         //make offscreen framebuffer: attach texture and renderbuffer to this framebuffer
+//         this.framebuffer = gl.createFramebuffer();
+//             //make this framebuffer this current framebuffer
+//         gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+//             //bind texture to framebuffer
+//         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+//             //bind renderbuffer to framebuffer
+//         gl.enable(gl.DEPTH_TEST);
+//         gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.renderbuffer);
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+//         //gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
  
-        //troubleshooting
-         if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
-            const error = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-            console.log('this combination of attachments does not work');
-            console.log(error);
-            return;
-         }
+//         //troubleshooting
+// //          if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
+// //             const error = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+// //             console.log('this combination of attachments does not work');
+// //             console.log(error);
+// //             return;
+// //          }
     
-        //cleanup: unbind this offscreen framebuffer so we go back to onscreen framebuffer 
-        gl.bindTexture(gl.TEXTURE_2D, null);
-        gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);  
+//         //cleanup: unbind this offscreen framebuffer so we go back to onscreen framebuffer 
+//         gl.bindTexture(gl.TEXTURE_2D, null);
+//         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+//         gl.bindFramebuffer(gl.FRAMEBUFFER, null);  
 
 
-    }
+//     }
 
     return_framebuffer() {
         return this.framebuffer;

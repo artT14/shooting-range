@@ -1313,6 +1313,12 @@ const Webgl_Manager = tiny.Webgl_Manager =
             gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 0, 0, 255]));
 
+            //added code////////////////////////////////////////////////////////////////////////////////////////////////
+            //make offscreen buffer:
+            this.make_buffer();
+
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
             // Find the correct browser's version of requestAnimationFrame() needed for queue-ing up re-display events:
             window.requestAnimFrame = (w =>
                 w.requestAnimationFrame || w.webkitRequestAnimationFrame
@@ -1344,20 +1350,82 @@ const Webgl_Manager = tiny.Webgl_Manager =
             this.prev_time = time;
 
             const gl = this.context;
+
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             // Clear the canvas's pixels and z-buffer.
 
+             
             const open_list = [...this.scenes];
             while (open_list.length) {
                 // Traverse all Scenes and their children, recursively.
                 open_list.push(...open_list[0].children);
                 // Call display() to draw each registered animation:
                 open_list.shift().display(this, this.program_state);
+
             }
             // Now that this frame is drawn, request that render() happen
             // again as soon as all other web page events are processed:
             this.event = window.requestAnimFrame(this.render.bind(this));
         }
+
+        //added code//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        make_buffer() {
+                //make offscreen texture to store colors 
+                    //only want to store colors of the scene, so texture size is size of canvas 
+                    //don't actually use this texture to draw anything; the colors (unique id's) are drawn here 
+                const gl = this.context;
+
+                var width = 1080;
+                var height = 600;
+
+                    //make texture
+                const texture = gl.createTexture();
+                    //bind texture, but do not bind an image to the texture 
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+
+
+                //make renderbuffer (z-buffer) and attach it to framebuffer
+                    //size is same as texture
+                    //for every pixel in framebuffer, store depth and color
+                const renderbuffer = gl.createRenderbuffer();
+                gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
+                gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+
+                //make offscreen framebuffer: attach texture and renderbuffer to this framebuffer
+                this.framebuffer = gl.createFramebuffer();
+                    //make this framebuffer this current framebuffer
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+                    //bind texture to framebuffer
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+                    //bind renderbuffer to framebuffer
+                gl.enable(gl.DEPTH_TEST);
+                gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, renderbuffer);
+
+                //gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+
+                //troubleshooting
+                 if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
+                    const error = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+                    console.log('this combination of attachments does not work');
+                    console.log(error);
+                    return;
+                 }
+
+                //cleanup: unbind this offscreen framebuffer so we go back to onscreen framebuffer 
+                gl.bindTexture(gl.TEXTURE_2D, null);
+                gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);  
+            }
+
+        get_framebuffer(){
+                return this.framebuffer;
+        }
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     }
 
 
