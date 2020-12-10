@@ -7,10 +7,16 @@
     <meta charset="UTF-8"/>
     <link href="assets/fav.ico" rel="icon">
     <title>Tiny Graphics</title>
+    <style>
+        .div1 {
+            padding: 200px 0;
+        }
+    </style>
 </head>
 <body style="background: White">
 <!-- Begin typing your web page here. -->
 <!-- The following code embeds a WebGL canvas panel, loads certain scene(s), and displays panel(s) of their controls.-->
+<div class = "div1">
 <div class="canvas-widget" id="main-canvas" style="cursor: crosshair;"></div>
 <script type=module>
     // ********************* THE ENTRY POINT OF YOUR WHOLE PROGRAM STARTS HERE *********************
@@ -21,7 +27,7 @@
     const scenes = [Main_Scene, ...Additional_Scenes].map(scene => new scene());
     // This line creates your scene.
     new Canvas_Widget(element_to_replace, scenes);
-</script>
+</script></div>
 
 </body>
 </html>
