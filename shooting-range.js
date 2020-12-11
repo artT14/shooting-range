@@ -688,7 +688,8 @@ export class ShootingRange extends Scene {
             let bg_trans = model_transform.times(Mat4.translation(0, 10, 20, 1)).times(Mat4.scale(25, 30, 0.3))
                 .times(Mat4.rotation(-Math.PI/4,0,0,1));
             this.shapes.range.draw(context, program_state, bg_trans, this.materials.texture4.override({ambient: periodic}));
-            let line = "Final score: " + Math.round(Target.FINAL_TIME).toString();
+            let score = Target.FINAL_TIME-this.timeStart;
+            let line = "Final score: " + Math.round(score).toString();
             this.shapes.text.set_string(line, context.context);
             this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-15, 10, 25))
                 .times(Mat4.scale(1.4, 1.4, 0)), this.materials.text_image);

@@ -1,30 +1,20 @@
-# tiny-graphics.js
+CS174A Team Project: Shooting Range
+Artavazd Torosyan, Angela Gu, Edgar Hukassian
 
-This is a small, single file JavaScript utility.  It organizes WebGL programs to be object-oriented and minimally cluttered.  
+We designed a aim-trainer style first-person shooter game with an abstract, non-realistic graphic style.
+Targets are randomly generated and the gun rotates and translates based on canvas mouse position. 
+The game is high-score based, with a base-level score of 30. Scoring is determined by how long you play:
+initially, the timer is set to 30 seconds, but each target hit adds time, and the goal is to play for
+as long as possible.
 
-Writing code with raw JavaScript and WebGL can be repetitive and tedious.  Using frameworks like three.js can create an undesired separation between you and the raw JavaScript and WebGL and common graphics operations you want to learn.  Unlike other frameworks, tiny-graphics.js is purpose-built for education, has small source code, and teaches you how it is made.
+The advanced feature implemented is mouse picking via an offscreen color buffer. All targets are drawn
+twice: onscreen with a non-unique black color, and offscreen with a unique randomly assigned color.
+When the player clicks, the offscreen color is read and if there is a match with an offscreen target
+color, that target is shot.
 
-This tiny library gives your WebGL program access to linear algebra routines, useful UI controls and readouts, and the drawing utilities needed by modern shader-based graphics.  It factors away the repetitive logic of GPU communication into re-usable objects.  The objects can be seamlessly shared between multiple WebGL contexts (drawing regions) on a web page.
+Implementation of the offscreen framebuffer for mouse picking was referenced from example code
+in the book "WebGL Beginner's Guide" by Diego Cantor and Brandon Jones in chapter 8, pages 259 to 261 
+and page 267. The 3D gun model was downloaded from https//free3d.com/.
 
-The tiny-graphics.js software library has accompanied UCLA Computer Science's 174a course (Intro to Computer Graphics) since 2016, replacing Edward Angel's supplemental code from his textbook "Interactive Computer Graphics: A Top-Down Approach with WebGL".  Compared to Angel's library, tiny-graphics.js offers more organization and functionality.
-
-This code library accompanies and supports a web project by the same author called "The Encyclopedia of Code", a crowd-sourced repository of WebGL demos and educational tutorials that uses an online editor.
-
-To run a sample using tiny-graphics.js, visit its GitHub Pages link: https://encyclopedia-of-code.github.io/tiny-graphics-js/
-
-To see all the demos and edit them:  Open the included "host.bat" or "host.command" file, then open localhost in your browser.  Open Developer Tools and create a workspace for your new folder.  Now you can edit the files, which is necessary to view the different demos.
-
-To select a demo, open and edit main-scene.js.  Assign your choice to the Main_Scene variable.  Your choices for scenes are:
-
-* Minimal_Webgl_Demo
-* Transforms_Sandbox
-* Axes_Viewer_Test_Scene
-* Inertia_Demo
-* Collision_Demo
-* Many_Lights_Demo
-* Obj_File_Demo
-* Text_Demo
-* Scene_To_Texture_Demo
-* Surfaces_Demo
-
-The code comments in each file should help, especially if you look at the definition of Transforms_Sandbox.  So should the explanations that the demos print on the page.  Enjoy!
+References: 
+Cantor, Diego and Brandon Jones. 'WebGL Beginner's Guide'. Packt Publishing, 2012.
