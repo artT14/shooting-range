@@ -408,6 +408,10 @@ export class ShootingRange extends Scene {
                 this.shapes.text.set_string(line2, context.context);
                 this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-13, 7, 25)),
                         this.materials.text_image.override({ambient: periodic2}));
+                let line3 = "IMPORTANT: EPILEPSY WARNING! ";
+                this.shapes.text.set_string(line3, context.context);
+                this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-10, 3, 25))
+                    .times(Mat4.scale(0.5, 0.5, 0)), this.materials.text_image.override({color: color(1,0,0,1)}));
 
             }
 

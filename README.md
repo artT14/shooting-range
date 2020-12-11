@@ -1,5 +1,7 @@
-CS174A Team Project: Shooting Range
-Artavazd Torosyan, Angela Gu, Edgar Hukassian
+CS174A Team Project: Shooting Range by
+Artavazd Torosyan, Angela Gu & Edgar Hukassian
+
+-----------------------
 
 We designed an aim trainer first-person shooter game with an abstract, non-realistic graphic style.
 Targets are randomly generated and the gun rotates and translates based on canvas mouse position. 
@@ -16,6 +18,15 @@ color, that target is shot.
 Implementation of the offscreen framebuffer for mouse picking was referenced from example code
 in the book "WebGL Beginner's Guide" by Diego Cantor and Brandon Jones in chapter 8, pages 259 to 261 
 and page 267. The 3D gun model was downloaded from https//free3d.com/.
+
+-----------------------
+
+Controls:
+- SWIVEL - Mouse Movement
+- SHOOT - Left Mouse Click. 
+- START/RESTART - Tab (when prompted).
+
+-----------------------
 
 References: 
 Cantor, Diego and Brandon Jones. 'WebGL Beginner's Guide'. Packt Publishing, 2012.
