@@ -75,8 +75,12 @@ class Target extends defs.Subdivision_Sphere{
         this.level = level; //in case you need the level of the object, might be useful into adding time when an Target is shot
         this.isShot = false; //in case you need to check whether a target has been shot, might be useful in adding time to timer when a target is shot
         
-        this.x_location = Math.floor(Math.random()*36) - 18 // generates a random initial location along x axis for the target
+        this.x_location = Math.floor(Math.random()*36) - 18; // generates a random initial location along x axis for the target
         this.move_right = Math.random() < 0.5; // generate a random boolean to determine direction of motion
+        
+        this.y_location = Math.floor(Math.random()*26) + 1;
+        this.move_up = Math.random() < 0.5;
+
         this.timeShot = 0.0; // records when the target was shot
     }
 
@@ -94,37 +98,16 @@ class Target extends defs.Subdivision_Sphere{
                 Target.SCORE += this.level / 2; //add to static member SCORE based on level, lvl 1 adds 1, lvl 2 adds 2, and so on
     }
 
-    // render draws each target object twice: once to the offscreen framebuffer, once to the onscreen framebuffer
-    render(webgl_manager, program_state, model_transform, material1, material2, type = "TRIANGLES", framebuffer){
-        const gl = webgl_manager.context;
-
-        //material 1 is offscreen (white for trial)
-        //material 2 is onscreen (black)
-
-        //bind framebuffer to read offscreen framebuffer
-         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-           
-        //draw offscreen
-            this.draw(webgl_manager, program_state, model_transform, material1, type = "TRIANGLES");  
-              
-
-        //onscreen rendering: draw to default onscreen buffer
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        
-        //draw onscreen
-            this.draw(webgl_manager, program_state, model_transform, material2, type = "TRIANGLES");
-           
-            
-     }
 
     check_if_shot(readout, key){
          
          //compare
-         if(this.compare(readout, key)){
+         let shot = this.compare(readout, key);
+         if(shot){
                 this.shoot();
          }
 
-         return true;
+         return shot;
 
     }
     //get readout; will be in vals 0-256
@@ -180,11 +163,10 @@ export class ShootingRange extends Scene {
         this.shapes.cylinder.arrays.texture_coord.map(function(x){return x.scale_by(0.5);});
         this.shapes.range.arrays.texture_coord.map(function(x){return x.scale_by(2);});
 
-///////////OFFSCREEN FRAMEBUFFER/////////////////////////////////////////////////////////////////////////////////////
-        //make offscreen texture and framebuffer:
-        //this.offscreen_buffer = new Offscreen_Framebuffer();
-        //this.offscreen_buffer.make_buffer(context)
-        
+
+        this.shots = 0; //number of times you click
+        this.hits = 0;  //number of times you hit a target
+        this.accuracy = 0; //this.hits / this.shots
 
 //////////////TARGET LIST ARRAY, we can use array to push targets when we want to create new one and pop them out when they are no longer in use e.g. shot
 //         this.target_key_list = [
@@ -362,7 +344,8 @@ export class ShootingRange extends Scene {
         //check if pixel under mouse is part of target
         for (let i=0; i < this.target_list.length; i++)
         {
-            this.target_list[i].check_if_shot(readout, this.keys[i]);
+            if(this.target_list[i].check_if_shot(readout, this.keys[i], this.hits))
+            this.hits++;
         }
 
     }
@@ -510,6 +493,7 @@ export class ShootingRange extends Scene {
                 Target.FINAL_TIME = t;
             }
             this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-8, 24, 5)), this.materials.text_image);
+      
 
 //DRAW TARGETS///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -518,55 +502,117 @@ export class ShootingRange extends Scene {
             for (var j = 0; j < 3; j++) { // number of z planes consisting of targets
                 for (var i = 0; i < 9; i++) { // number of targets along the y axis on a given z plane
                     if (!Target.IS_GAME_OVER) {
-                        // draw all targets in target_list that aren't shot:
-                        if (!this.target_list[index].isShot) {
-                            // test if we are in level 2. if so, move target and slowly decrease its size until a certain point:
-                            if ((t - this.timeStart) > 10) { // adjust right side to control when game transitions from level 1 to level 2
-                                if (this.target_list[index].x_location > 18 || this.target_list[index].x_location < -18)
-                                    this.target_list[index].move_right ^= true; // change direction of motion if needed
+                                
+                         //targets in second z plane move up and down
+                         if(j==1){
+                             // draw all targets in target_list that aren't shot:
+                               if (!this.target_list[index].isShot) {
+                                    // test if we are in level 2. if so, move target and slowly decrease its size until a certain point:
+                                    if ((t - this.timeStart) > 10) { // adjust right side to control when game transitions from level 1 to level 2
 
-                                if (this.target_list[index].move_right) {
-                                    this.target_list[index].x_location += 0.1; // adjust right side to control how fast objects move
-                                } else {
-                                    this.target_list[index].x_location -= 0.1; // same as above
-                                }
+                                        if (this.target_list[index].y_location > 27 || this.target_list[index].y_location < 1)
+                                            this.target_list[index].move_up ^= true; // change direction of motion if needed
 
-                                if (Target.SCALE_FACTOR > 0.5) { // adjust right side to control minimum size of targets
-                                    Target.SCALE_FACTOR -= 0.00001; // adjust right side to control how fast targets get smaller as time goes on
-                                }
+                                        if (this.target_list[index].move_up) {
+                                            this.target_list[index].y_location += 0.1; // adjust right side to control how fast objects move
+                                        } 
+                                        else {
+                                            this.target_list[index].y_location -= 0.1; // same as above
+                                        }  
 
+                                        if (Target.SCALE_FACTOR > 0.5) { // adjust right side to control minimum size of targets
+                                        Target.SCALE_FACTOR -= 0.00001; // adjust right side to control how fast targets get smaller as time goes on
+                                        }   
+                                    }
+
+                                    let target_transform = model_transform.times(Mat4.translation(this.target_list[index].x_location, this.target_list[index].y_location, -9 + j * 6))
+                                    .times(Mat4.scale(Target.SCALE_FACTOR, Target.SCALE_FACTOR, Target.SCALE_FACTOR));
+
+                                    //draw offscreen
+                                    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+                                    this.target_list[index].draw(context, program_state, target_transform, this.materials.offscreen_target.override({color: this.keys[index]}));
+
+                                    //draw onscreen
+                                    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                                    this.target_list[index].draw(context, program_state, target_transform, this.materials.target);
+                                    this.target_list[index].t = program_state.animation_time;
                             }
-                            let target_transform = model_transform.times(Mat4.translation(this.target_list[index].x_location, 2 + i * 3 + hover, -9 + j * 6))
-                                .times(Mat4.scale(Target.SCALE_FACTOR, Target.SCALE_FACTOR, Target.SCALE_FACTOR));
 
-                            //draw the target in onscreen framebuffer and offscreen framebuffer
-                            //this.target_list[index].render(context, program_state, target_transform, this.materials.offscreen_target.override({color: this.keys[index]}), this.materials.target, "TRIANGLES",framebuffer);
+                             // if target was recently shot, increase target in size for a short time before making it disappear:
+                            else if (program_state.animation_time - this.target_list[index].timeShot < 1000) { // adjust right side to control how long target increases in size before disappearing
+                                let delta_t = (program_state.animation_time - this.target_list[index].timeShot) / 2000; // adjust denominator to control the rate at which target increases in size before disappearing
+                                let target_transform = model_transform.times(Mat4.translation(this.target_list[index].x_location, this.target_list[index].y_location, -9 + j * 6))
+                                    .times(Mat4.scale(Target.SCALE_FACTOR + delta_t, Target.SCALE_FACTOR + delta_t, Target.SCALE_FACTOR + delta_t));
+                                this.target_list[index].draw(context, program_state, target_transform, this.materials.target.override({
+                                    ambient: .3,
+                                    color: this.color_changer[1]
+                                }));
+                            }
+                            // make a new target in place of old target after a short while:
+                            else if (program_state.animation_time - this.target_list[index].timeShot > 2000) {
+                                this.target_list.splice(index, 1, new (Target.prototype.make_flat_shaded_version())(t > 10 ? 2 : 1)); // if 10 seconds has passed, make level 2 targets instead of level 1
+                            }
+                            index++;
+                         }
+                                
+                                //other targets move left and right
+                         else{
+                                // draw all targets in target_list that aren't shot:
+                               if (!this.target_list[index].isShot) {
+                                 // test if we are in level 2. if so, move target and slowly decrease its size until a certain point:
+                                    if ((t - this.timeStart) > 10) { // adjust right side to control when game transitions from level 1 to level 2
+                                        if (this.target_list[index].x_location > 18 || this.target_list[index].x_location < -18)
+                                            this.target_list[index].move_right ^= true; // change direction of motion if needed
 
-                            //draw offscreen
-                            gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-                            this.target_list[index].draw(context, program_state, target_transform, this.materials.offscreen_target.override({color: this.keys[index]}));
+                                        if (this.target_list[index].move_right) {
+                                            this.target_list[index].x_location += 0.1; // adjust right side to control how fast objects move
+                                        } else {
+                                            this.target_list[index].x_location -= 0.1; // same as above
+                                        }   
 
-                            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                            this.target_list[index].draw(context, program_state, target_transform, this.materials.target);
-                            this.target_list[index].t = program_state.animation_time;
-                        }
+                                        if (Target.SCALE_FACTOR > 0.5) { // adjust right side to control minimum size of targets
+                                        Target.SCALE_FACTOR -= 0.00001; // adjust right side to control how fast targets get smaller as time goes on
+                                        }   
+                                    }
 
-                        // if target was recently shot, increase target in size for a short time before making it disappear:
-                        else if (program_state.animation_time - this.target_list[index].timeShot < 1000) { // adjust right side to control how long target increases in size before disappearing
-                            let delta_t = (program_state.animation_time - this.target_list[index].timeShot) / 2000; // adjust denominator to control the rate at which target increases in size before disappearing
-                            let target_transform = model_transform.times(Mat4.translation(this.target_list[index].x_location, 2 + i * 3 + hover, -9 + j * 6))
-                                .times(Mat4.scale(Target.SCALE_FACTOR + delta_t, Target.SCALE_FACTOR + delta_t, Target.SCALE_FACTOR + delta_t));
-                            this.target_list[index].draw(context, program_state, target_transform, this.materials.target.override({
-                                ambient: .3,
-                                color: this.color_changer[1]
-                            }));
-                        }
+                                    let target_transform = model_transform.times(Mat4.translation(this.target_list[index].x_location, 2 + i * 3 + hover, -9 + j * 6))
+                                    .times(Mat4.scale(Target.SCALE_FACTOR, Target.SCALE_FACTOR, Target.SCALE_FACTOR));
 
-                        // make a new target in place of old target after a short while:
-                        else if (program_state.animation_time - this.target_list[index].timeShot > 2000) {
-                            this.target_list.splice(index, 1, new (Target.prototype.make_flat_shaded_version())(t > 10 ? 2 : 1)); // if 10 seconds has passed, make level 2 targets instead of level 1
-                        }
-                        index++;
+                                    //draw offscreen
+                                    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+                                    this.target_list[index].draw(context, program_state, target_transform, this.materials.offscreen_target.override({color: this.keys[index]}));
+
+                                    //draw onscreen
+                                    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                                    this.target_list[index].draw(context, program_state, target_transform, this.materials.target);
+                                    this.target_list[index].t = program_state.animation_time;
+                             }
+
+                             else if (program_state.animation_time - this.target_list[index].timeShot < 1000) { // adjust right side to control how long target increases in size before disappearing
+                                let delta_t = (program_state.animation_time - this.target_list[index].timeShot) / 2000; // adjust denominator to control the rate at which target increases in size before disappearing
+                                let target_transform = model_transform.times(Mat4.translation(this.target_list[index].x_location, 2 + i * 3 + hover, -9 + j * 6))
+                                    .times(Mat4.scale(Target.SCALE_FACTOR + delta_t, Target.SCALE_FACTOR + delta_t, Target.SCALE_FACTOR + delta_t));
+                                this.target_list[index].draw(context, program_state, target_transform, this.materials.target.override({
+                                    ambient: .3,
+                                    color: this.color_changer[1]
+                                }));
+                            }
+
+                            // make a new target in place of old target after a short while:
+                            else if (program_state.animation_time - this.target_list[index].timeShot > 2000) {
+                                this.target_list.splice(index, 1, new (Target.prototype.make_flat_shaded_version())(t > 10 ? 2 : 1)); // if 10 seconds has passed, make level 2 targets instead of level 1
+                            }
+                            index++;
+                         }
+                        
+                                
+
+                            
+                        
+
+                       
+
+                        
                     }
 
                 }
@@ -631,6 +677,7 @@ export class ShootingRange extends Scene {
                 console.log(shoot);
                 model_transform_gun = model_transform_gun.times(Mat4.translation(0, 0, 3)).times(Mat4.scale(0.25, 0.25, 0))
                 this.shapes.muzzle.draw(context, program_state, model_transform_gun, this.materials.muzzleFlash);
+                this.shots++;
                 this.mouse_picking(context, program_state, model_transform, framebuffer);
             }
 
@@ -645,106 +692,31 @@ export class ShootingRange extends Scene {
             this.shapes.text.set_string(line, context.context);
             this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-15, 10, 25))
                 .times(Mat4.scale(1.4, 1.4, 0)), this.materials.text_image);
+
+            
+            if (this.shots == 0)
+                this.accuracy = 0;
+            else
+                this.accuracy = (this.hits / this.shots * 100).toPrecision(4);
+            let line_acc = "Accuracy:" + this.accuracy.toString() + "%";
+            this.shapes.text.set_string(line_acc, context.context);
+            this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-10.5, 7, 25)),
+                this.materials.text_image);
+            
+
             let line2 = "Press Tab to Restart";
             this.shapes.text.set_string(line2, context.context);
-            this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-14.5, 7, 25)),
+            this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-14.5, 4, 25)),
                 this.materials.text_image.override({ambient: periodic2}));
 
         }
     }
 }
 
-////////////////OFFSCREEN NEW TEXTURE AND FRAMEBUFFER///////////////////////////////////////////////////////////
-class Offscreen_Framebuffer extends Graphics_Card_Object {
-    constructor(){
-        super();
-        this.framebuffer = null;
-        this.texture = null;
-        this.renderbuffer = null;
-
-//         for (let name of ["webgl", "experimental-webgl", "webkit-3d", "moz-webgl"]) {
-//                 this.context = this.canvas.getContext(name);
-//                 if (this.context) break;
-//             }
-//             if (!this.context) throw "Canvas failed to make a WebGL context.";
-//             const gl = this.context;
-
-    }
-
-//     make_buffer(webgl_manager) {
-//         //make offscreen texture to store colors 
-//             //only want to store colors of the scene, so texture size is size of canvas 
-//             //don't actually use this texture to draw anything; the colors (unique id's) are drawn here 
-//         const gl = webgl_manager.context;
-        
-//         var width = 1080;
-//         var height = 600;
-
-//             //make texture
-//         this.texture = gl.createTexture();
-//             //bind texture, but do not bind an image to the texture 
-//         gl.bindTexture(gl.TEXTURE_2D, this.texture);
-//         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-//         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-//         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-//         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    
-
-    
-//         //make renderbuffer (z-buffer) and attach it to framebuffer
-//             //size is same as texture
-//             //for every pixel in framebuffer, store depth and color
-//         this.renderbuffer = gl.createRenderbuffer();
-//         gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
-//         gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
-        
-//         //make offscreen framebuffer: attach texture and renderbuffer to this framebuffer
-//         this.framebuffer = gl.createFramebuffer();
-//             //make this framebuffer this current framebuffer
-//         gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
-//             //bind texture to framebuffer
-//         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
-//             //bind renderbuffer to framebuffer
-//         gl.enable(gl.DEPTH_TEST);
-//         gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.renderbuffer);
-
-//         //gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
- 
-//         //troubleshooting
-// //          if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
-// //             const error = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-// //             console.log('this combination of attachments does not work');
-// //             console.log(error);
-// //             return;
-// //          }
-    
-//         //cleanup: unbind this offscreen framebuffer so we go back to onscreen framebuffer 
-//         gl.bindTexture(gl.TEXTURE_2D, null);
-//         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-//         gl.bindFramebuffer(gl.FRAMEBUFFER, null);  
 
 
-//     }
 
-    return_framebuffer() {
-        return this.framebuffer;
-    }
 
-    return_renderbuffer() {
-        return this.renderbuffer;
-    }
-
-    return_texture(){
-        return this.texture;
-    }
-
-    clear(webgl_manager) {
-        const gl = webgl_manager.context;
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-    }
-
-}
 
 
     
