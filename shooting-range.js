@@ -384,7 +384,7 @@ export class ShootingRange extends Scene {
             color(0.5 - (0.5 * periodic), 0, 0.5 + (0.5 * periodic), 1),
             ];
 
-        if(t + this.timeStart > 30)
+        if(t - this.timeStart > 40)
             this.color_changer[4] = color(1,1,1,1);
 
             const light_position = vec4(0, 30, 60, 1);
@@ -433,7 +433,7 @@ export class ShootingRange extends Scene {
             let wall_transform = model_transform.times(Mat4.translation(0, 10, -10, 1)).times(Mat4.scale(25, 30, 0.3));
             let wall_transform_2 = model_transform.times(Mat4.translation(20, 10, -10)).times(Mat4.scale(0.3, 30, 50));
 
-            if(t + this.timeStart > 30){
+            if(t - this.timeStart > 40){
                 this.shapes.range.draw(context, program_state, floor_transform, this.materials.range2.override({color: this.color_changer[3]}));
 
                 this.shapes.range.draw(context, program_state, wall_transform, this.materials.range2.override({color: this.color_changer[3]}));
